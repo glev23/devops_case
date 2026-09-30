@@ -2,7 +2,7 @@
 
 **Обновлено:** 2026-09-30. Стек выбран, кластер kubeadm поднимается одной
 командой `sudo ./deploy.sh` на чистой Ubuntu 24.04, повторный запуск ничего
-не меняет (CLUSTER-001). Приложение развёрнуто (APP-001). Дальше — Gateway API, мониторинг, логи. До дедлайна
+не меняет (CLUSTER-001). Приложение доступно снаружи через Gateway API (APP-001, GW-001), CI на каждый push разворачивает всё с нуля (CI-001). Дальше — мониторинг и логи. До дедлайна
 (4 октября, 23:59) четыре дня.
 
 Этот файл — краткий срез готовности решения по требованиям кейса.
@@ -14,7 +14,7 @@
 |---|---|---|---|
 | 1. Kubernetes-окружение | ✅ | CLUSTER-001 | kubeadm v1.36.5 + containerd 2.2.1 + Calico 3.32.2, 1 узел |
 | 2. Демонстрационное приложение | ✅ | APP-001 | nginx 1.30.5 (non-root), `Hello World! from <pod>`, JSON access-лог |
-| 3. Gateway API | ⬜ | GW-001 | Envoy Gateway 1.9, NodePort 30080 |
+| 3. Gateway API | ✅ | GW-001 | Envoy Gateway 1.9.2: GatewayClass → Gateway → HTTPRoute, `curl http://<IP>:30080/` |
 | 4. Мониторинг (Prometheus) | ⬜ | MON-001 | kube-prometheus-stack |
 | 5. Логирование (Fluentd / Filebeat) | ⬜ | LOG-001 | Fluentd → Loki → Grafana |
 | 6. Ubuntu 24.04 | ⬜ | QA-001 | Подтверждается прогоном с нуля на чистой VM |
@@ -28,7 +28,7 @@
 | Расширенный Gateway API (маршруты, host/path, несколько backend, splitting, TLS) | ⬜ | GW-002 |
 | Grafana: дашборды (кластер, CPU/RAM), метрики и логи Loki в одном окне, доступ через Gateway | ⬜ | GRAF-001 |
 | HTTP-метрики (запросы, коды, latency) + свой дашборд | ⬜ | MON-002 |
-| CI/CD: линты, поиск секретов, развёртывание с нуля на Ubuntu 24.04 (kubeadm) на каждый push | ⏳ | CI-001 |
+| CI/CD: линты, поиск секретов, развёртывание с нуля на Ubuntu 24.04 (kubeadm) на каждый push | ✅ | CI-001 |
 | Практики надёжности и безопасности | ⬜ | SEC-001 |
 
 ## Материалы сдачи

@@ -37,11 +37,11 @@ APP-001, MON-001.
 | Выбор стека | ✅ | kubeadm 1.36.5 + containerd + Calico 3.32 · Envoy Gateway 1.9 (NodePort) · kube-prometheus-stack · Fluentd → Loki · Ansible + Helm + Kustomize · GitHub Actions |
 | Стенд Ubuntu 24.04 и кластер | ✅ | CLUSTER-001: kubeadm 1.36.5, containerd 2.2.1, Calico 3.32.2, Helm 3.22.0, узел `10.200.0.10`. Снимки VM: `clean-ubuntu-v2`, `cluster-ready-v2` |
 | Приложение | ✅ | APP-001: `demo/hello`, nginx-unprivileged 1.30.5, 2 реплики, JSON-логи, `stub_status` на 8081 |
-| Gateway API | ⬜ | — |
+| Gateway API | ✅ | GW-001: Envoy Gateway 1.9.2, `GatewayClass eg` → `Gateway gateway/main` (NodePort 30080) → `HTTPRoute demo/hello` |
 | Prometheus | ⬜ | — |
 | Сбор логов | ⬜ | — |
 | Автоматизация (`./deploy.sh`) | ⏳ | Каркас: `deploy.sh` → Ansible (роли node, kubeadm, cni, helm), идемпотентно |
-| CI/CD | ⏳ | CI-001: lint + secrets + e2e (kubeadm с нуля на раннере ubuntu-24.04, повторный прогон, verify) — ждёт первого запуска |
+| CI/CD | ✅ | CI-001: lint + secrets + e2e (kubeadm с нуля на раннере ubuntu-24.04, повтор `changed=0`, verify) — зелёный, e2e 3 мин 31 с |
 | Материалы сдачи | ⬜ | — |
 
 ## Ближайший фокус
@@ -59,12 +59,14 @@ MTU 1400.
 
 **APP-001 закрыта** (30.09.2026) — [app-001.md](./tasks/app-001.md).
 
-**CI-001 в работе** — [ci-001.md](./tasks/ci-001.md): взята раньше QA-001 по
-запросу. Это оправдано: e2e-job автоматически гоняет установку с нуля на
-каждый push, то есть частично заменяет ручной QA и страхует основную линию.
-Локально линтеры и `verify.sh` зелёные; ждём первый запуск в GitHub.
+**CI-001 закрыта** — [ci-001.md](./tasks/ci-001.md): взята раньше QA-001 по
+запросу. Это оправдано: e2e-job на каждый push гоняет установку с нуля на
+Ubuntu 24.04 и частично заменяет ручной QA.
 
-**Дальше:** GW-001 (основная линия), параллельно можно MON-001 и LOG-001.
+**GW-001 закрыта** — [gw-001.md](./tasks/gw-001.md): `curl http://<IP>:30080/`
+через Envoy Gateway → `Hello World!`, проверено с Windows-ПК и в CI.
+
+**Дальше:** MON-001 (Prometheus), затем LOG-001 (Fluentd → Loki).
 
 ## Очередь выполнения
 
@@ -80,7 +82,7 @@ MTU 1400.
 | № | Задача | Статус | Зависимости | Законченный результат |
 |---:|---|---|---|---|
 | 30 | [APP-001](./tasks/app-001.md) | `done` | CLUSTER-001 | Приложение в кластере отвечает `Hello World!` изнутри кластера, access-логи в stdout |
-| 40 | GW-001 | `ready` | APP-001 | Контроллер Gateway API, `GatewayClass`, `Gateway`, `HTTPRoute`; `curl` на Gateway → `Hello World!` |
+| 40 | [GW-001](./tasks/gw-001.md) | `done` | APP-001 | Контроллер Gateway API, `GatewayClass`, `Gateway`, `HTTPRoute`; `curl` на Gateway → `Hello World!` |
 | 50 | MON-001 | `ready` | CLUSTER-001 | Prometheus развёрнут, минимум один target `UP`, PromQL-запрос возвращает данные |
 | 60 | LOG-001 | `ready` | APP-001 | Fluentd или Filebeat собирает логи приложения; запрос с уникальной меткой находится в хранилище |
 | 70 | AUTO-001 | `planned` | GW-001, MON-001, LOG-001 | Одна команда разворачивает всё с нуля; повторный запуск не ломает состояние; `make verify` проходит |
@@ -90,11 +92,11 @@ MTU 1400.
 
 | № | Задача | Статус | Зависимости | Законченный результат |
 |---:|---|---|---|---|
-| 90 | GW-002 | `planned` | GW-001 | Маршруты по host и path, несколько backend, traffic splitting по весам, TLS — у каждого есть `curl`-проверка |
+| 90 | GW-002 | `ready` | GW-001 | Маршруты по host и path, несколько backend, traffic splitting по весам, TLS — у каждого есть `curl`-проверка |
 | 95 | GRAF-001 | `planned` | MON-001, LOG-001, GW-001 | Grafana из kube-prometheus-stack: datasources Prometheus + Loki, готовые дашборды кластера (CPU/RAM), доступ через Gateway (`HTTPRoute`), пароль admin — из сгенерированного Secret, не из репозитория |
 | 100 | MON-002 | `planned` | MON-001, GW-001, GRAF-001 | HTTP-метрики Envoy (запросы, коды, latency) + свой дашборд JSON в репозитории |
 | 110 | SEC-001 | `planned` | APP-001 | requests/limits, probes, securityContext, реплики + PDB, NetworkPolicy |
-| 120 | [CI-001](./tasks/ci-001.md) | `in_progress` | CLUSTER-001, APP-001 | lint + gitleaks + e2e: `deploy.sh` с нуля на раннере ubuntu-24.04 (kubeadm), повтор с `changed=0`, `verify.sh` |
+| 120 | [CI-001](./tasks/ci-001.md) | `done` | CLUSTER-001, APP-001 | lint + gitleaks + e2e: `deploy.sh` с нуля на раннере ubuntu-24.04 (kubeadm), повтор с `changed=0`, `verify.sh` |
 
 ### Сдача
 
