@@ -7,3 +7,9 @@
     - kubeadm
     - cni
     - helm
+
+- name: Workloads
+  hosts: k8s
+  become: true
+  roles:
+    - app

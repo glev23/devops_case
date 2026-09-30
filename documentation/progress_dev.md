@@ -5,6 +5,9 @@
 запуск даёт `changed=0`, кластер переживает смену IP. Следующие `ready`:
 APP-001, MON-001.
 
+**APP-001 закрыта** (30.09.2026): nginx 1.30.5 (non-root), `Hello World! from
+<pod>`, JSON access-лог в stdout, 2 реплики, повтор — `changed=0`.
+
 Этот файл — канонический источник порядка и статусов задач. Если задача не
 названа явно, следующей берётся первая строка `ready` с закрытыми
 зависимостями. Одновременно допускается одна основная задача `in_progress`.
@@ -33,7 +36,7 @@ APP-001, MON-001.
 | Кейс и документация | ✅ | DOCS-001: кейс.md, README, architecture.md (рев. 3), progress, tasks |
 | Выбор стека | ✅ | kubeadm 1.36.5 + containerd + Calico 3.32 · Envoy Gateway 1.9 (NodePort) · kube-prometheus-stack · Fluentd → Loki · Ansible + Helm + Kustomize · GitHub Actions |
 | Стенд Ubuntu 24.04 и кластер | ✅ | CLUSTER-001: kubeadm 1.36.5, containerd 2.2.1, Calico 3.32.2, Helm 3.22.0, узел `10.200.0.10`. Снимки VM: `clean-ubuntu-v2`, `cluster-ready-v2` |
-| Приложение | ⬜ | — |
+| Приложение | ✅ | APP-001: `demo/hello`, nginx-unprivileged 1.30.5, 2 реплики, JSON-логи, `stub_status` на 8081 |
 | Gateway API | ⬜ | — |
 | Prometheus | ⬜ | — |
 | Сбор логов | ⬜ | — |
@@ -53,7 +56,9 @@ MTU 1400.
 стабильный адрес узла на dummy-интерфейсе) и ложный `changed` на Calico
 `Installation`.
 
-**Дальше:** APP-001 (nginx, основная линия), параллельно можно MON-001.
+**APP-001 закрыта** (30.09.2026) — [app-001.md](./tasks/app-001.md).
+
+**Дальше:** GW-001 (основная линия), параллельно можно MON-001 и LOG-001.
 
 ## Очередь выполнения
 
@@ -68,10 +73,10 @@ MTU 1400.
 
 | № | Задача | Статус | Зависимости | Законченный результат |
 |---:|---|---|---|---|
-| 30 | APP-001 | `ready` | CLUSTER-001 | Приложение в кластере отвечает `Hello World!` изнутри кластера, access-логи в stdout |
-| 40 | GW-001 | `planned` | APP-001 | Контроллер Gateway API, `GatewayClass`, `Gateway`, `HTTPRoute`; `curl` на Gateway → `Hello World!` |
+| 30 | [APP-001](./tasks/app-001.md) | `done` | CLUSTER-001 | Приложение в кластере отвечает `Hello World!` изнутри кластера, access-логи в stdout |
+| 40 | GW-001 | `ready` | APP-001 | Контроллер Gateway API, `GatewayClass`, `Gateway`, `HTTPRoute`; `curl` на Gateway → `Hello World!` |
 | 50 | MON-001 | `ready` | CLUSTER-001 | Prometheus развёрнут, минимум один target `UP`, PromQL-запрос возвращает данные |
-| 60 | LOG-001 | `planned` | APP-001 | Fluentd или Filebeat собирает логи приложения; запрос с уникальной меткой находится в хранилище |
+| 60 | LOG-001 | `ready` | APP-001 | Fluentd или Filebeat собирает логи приложения; запрос с уникальной меткой находится в хранилище |
 | 70 | AUTO-001 | `planned` | GW-001, MON-001, LOG-001 | Одна команда разворачивает всё с нуля; повторный запуск не ломает состояние; `make verify` проходит |
 | 80 | QA-001 | `planned` | AUTO-001 | Прогон по инструкции на чистой Ubuntu 24.04: развёртывание + все проверки, время и ресурсы записаны |
 

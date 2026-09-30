@@ -27,3 +27,6 @@ helm_version: "v3.22.0"
 # Пользователь, которому кладётся kubeconfig (тот, кто вызвал sudo)
 kube_user: "{{ lookup('ansible.builtin.env', 'SUDO_USER') | default('root', true) }}"
 kubeconfig: /etc/kubernetes/admin.conf
+
+# Корень репозитория (манифесты Kustomize лежат в deploy/)
+repo_root: "{{ playbook_dir | dirname }}"
