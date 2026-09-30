@@ -1,0 +1,121 @@
+---
+# Подготовка Ubuntu 24.04 к kubeadm: swap, модули ядра, sysctl, containerd.
+
+- name: Disable swap now
+  ansible.builtin.command: swapoff -a
+  when: ansible_swaptotal_mb | int > 0
+  changed_when: true
+
+- name: Disable swap permanently
+  ansible.builtin.replace:
+    path: /etc/fstab
+    regexp: '^([^#].*\sswap\s.*)$'
+    replace: '# \1'
+
+- name: Persist kernel modules for container networking
+  ansible.builtin.copy:
+    dest: /etc/modules-load.d/k8s.conf
+    content: |
+      overlay
+      br_netfilter
+    mode: "0644"
+
+- name: Load kernel modules
+  community.general.modprobe:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - overlay
+    - br_netfilter
+
+- name: Set sysctl for Kubernetes networking
+  ansible.posix.sysctl:
+    name: "{{ item }}"
+    value: "1"
+    sysctl_file: /etc/sysctl.d/99-kubernetes.conf
+    reload: true
+  loop:
+    - net.ipv4.ip_forward
+    - net.bridge.bridge-nf-call-iptables
+    - net.bridge.bridge-nf-call-ip6tables
+
+- name: Create stable node address interface
+  ansible.builtin.copy:
+    dest: "/etc/systemd/network/{{ item.file }}"
+    content: "{{ item.content }}"
+    mode: "0644"
+  loop:
+    - file: 10-k8s-stable.netdev
+      content: |
+        [NetDev]
+        Name=k8s0
+        Kind=dummy
+    - file: 10-k8s-stable.network
+      content: |
+        [Match]
+        Name=k8s0
+
+        [Network]
+        Address={{ node_stable_ip }}/32
+  when: node_stable_ip | length > 0
+  register: stable_ip_files
+
+- name: Apply stable node address
+  ansible.builtin.command: networkctl reload
+  when: stable_ip_files is changed
+  changed_when: true
+
+- name: Wait for stable node address
+  ansible.builtin.command: ip -4 -o addr show dev k8s0
+  register: stable_ip_addr
+  until: node_stable_ip in stable_ip_addr.stdout
+  retries: 10
+  delay: 2
+  changed_when: false
+  when: node_stable_ip | length > 0
+
+- name: Install base packages and containerd
+  ansible.builtin.apt:
+    name:
+      - apt-transport-https
+      - ca-certificates
+      - curl
+      - gpg
+      - containerd
+      - python3-kubernetes
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Create containerd config directory
+  ansible.builtin.file:
+    path: /etc/containerd
+    state: directory
+    mode: "0755"
+
+- name: Check containerd config exists
+  ansible.builtin.stat:
+    path: /etc/containerd/config.toml
+  register: containerd_config
+
+- name: Generate default containerd config
+  ansible.builtin.shell: containerd config default > /etc/containerd/config.toml
+  when: not containerd_config.stat.exists
+  changed_when: true
+  notify: Restart containerd
+
+- name: Use systemd cgroup driver in containerd
+  ansible.builtin.replace:
+    path: /etc/containerd/config.toml
+    regexp: 'SystemdCgroup = false'
+    replace: 'SystemdCgroup = true'
+  notify: Restart containerd
+
+- name: Enable containerd
+  ansible.builtin.systemd_service:
+    name: containerd
+    enabled: true
+    state: started
+
+- name: Apply containerd config before kubeadm
+  ansible.builtin.meta: flush_handlers

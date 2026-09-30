@@ -1,0 +1,81 @@
+---
+# Calico через tigera-operator.
+
+- name: Download tigera-operator manifest
+  ansible.builtin.get_url:
+    url: "https://raw.githubusercontent.com/projectcalico/calico/{{ calico_version }}/manifests/tigera-operator.yaml"
+    dest: "/etc/kubernetes/tigera-operator-{{ calico_version }}.yaml"
+    mode: "0644"
+
+- name: Apply tigera-operator
+  kubernetes.core.k8s:
+    kubeconfig: "{{ kubeconfig }}"
+    src: "/etc/kubernetes/tigera-operator-{{ calico_version }}.yaml"
+    state: present
+    apply: true
+    server_side_apply:
+      field_manager: ansible
+
+- name: Wait for Installation CRD
+  kubernetes.core.k8s_info:
+    kubeconfig: "{{ kubeconfig }}"
+    kind: CustomResourceDefinition
+    name: installations.operator.tigera.io
+    wait: true
+    wait_condition:
+      type: Established
+      status: "True"
+
+# Installation создаётся один раз: после установки оператор становится владельцем
+# spec (дописывает значения по умолчанию, ipPools), а пул IP Calico
+# после создания не меняется. Повторное применение дало бы ложный changed
+# или конфликт server-side apply.
+- name: Check Calico installation
+  kubernetes.core.k8s_info:
+    kubeconfig: "{{ kubeconfig }}"
+    api_version: operator.tigera.io/v1
+    kind: Installation
+    name: default
+  register: calico_installation
+
+- name: Configure Calico installation
+  kubernetes.core.k8s:
+    kubeconfig: "{{ kubeconfig }}"
+    state: present
+    template: installation.yaml.j2
+  when: calico_installation.resources | length == 0
+
+- name: Wait for node Ready
+  kubernetes.core.k8s_info:
+    kubeconfig: "{{ kubeconfig }}"
+    kind: Node
+    wait: true
+    wait_condition:
+      type: Ready
+      status: "True"
+    wait_timeout: 600
+
+- name: Wait for Calico components
+  kubernetes.core.k8s_info:
+    kubeconfig: "{{ kubeconfig }}"
+    api_version: operator.tigera.io/v1
+    kind: TigeraStatus
+    name: "{{ item }}"
+    wait: true
+    wait_condition:
+      type: Available
+      status: "True"
+    wait_timeout: 600
+  loop: [calico, apiserver]
+
+- name: Wait for CoreDNS
+  kubernetes.core.k8s_info:
+    kubeconfig: "{{ kubeconfig }}"
+    kind: Deployment
+    namespace: kube-system
+    name: coredns
+    wait: true
+    wait_condition:
+      type: Available
+      status: "True"
+    wait_timeout: 600

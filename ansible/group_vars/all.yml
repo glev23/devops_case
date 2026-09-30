@@ -1,0 +1,29 @@
+---
+# Все версии и параметры решения — только здесь.
+# Совместимость сверена 30.09.2026 (documentation/architecture.md, §3).
+
+# Kubernetes (kubeadm)
+k8s_minor: "1.36"
+k8s_version: "1.36.5"
+k8s_pkg_version: "{{ k8s_version }}-1.1"
+
+pod_cidr: "10.244.0.0/16"
+service_cidr: "10.96.0.0/12"
+
+# Стабильный адрес узла на dummy-интерфейсе. kubeadm вшивает IP узла в
+# сертификаты и конфиги, а DHCP (облачные VM, Hyper-V, Multipass) может
+# сменить адрес после перезагрузки — кластер бы сломался. API, kubelet и
+# Calico привязаны к этому адресу; снаружи сервисы доступны по любому IP узла
+# (NodePort слушает на всех адресах). Пустая строка — использовать основной IPv4.
+node_stable_ip: "10.200.0.10"
+node_ip: "{{ node_stable_ip if node_stable_ip | length > 0 else ansible_default_ipv4.address }}"
+
+# CNI
+calico_version: "v3.32.2"
+
+# Helm (ветка 3: модули kubernetes.core рассчитаны на Helm 3)
+helm_version: "v3.22.0"
+
+# Пользователь, которому кладётся kubeconfig (тот, кто вызвал sudo)
+kube_user: "{{ lookup('ansible.builtin.env', 'SUDO_USER') | default('root', true) }}"
+kubeconfig: /etc/kubernetes/admin.conf

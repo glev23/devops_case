@@ -1,0 +1,9 @@
+---
+- name: Kubernetes node and cluster
+  hosts: k8s
+  become: true
+  roles:
+    - node
+    - kubeadm
+    - cni
+    - helm

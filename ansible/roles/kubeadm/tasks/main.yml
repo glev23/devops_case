@@ -1,0 +1,89 @@
+---
+# kubelet/kubeadm/kubectl закреплённой версии и kubeadm init (только если кластера нет).
+
+- name: Create apt keyrings directory
+  ansible.builtin.file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: "0755"
+
+- name: Add Kubernetes apt key
+  ansible.builtin.shell: >
+    curl -fsSL https://pkgs.k8s.io/core:/stable:/v{{ k8s_minor }}/deb/Release.key
+    | gpg --dearmor -o /etc/apt/keyrings/kubernetes-{{ k8s_minor }}.gpg
+  args:
+    creates: /etc/apt/keyrings/kubernetes-{{ k8s_minor }}.gpg
+
+- name: Add Kubernetes apt repository
+  ansible.builtin.apt_repository:
+    repo: >-
+      deb [signed-by=/etc/apt/keyrings/kubernetes-{{ k8s_minor }}.gpg]
+      https://pkgs.k8s.io/core:/stable:/v{{ k8s_minor }}/deb/ /
+    filename: kubernetes
+    state: present
+
+- name: Install kubelet, kubeadm, kubectl
+  ansible.builtin.apt:
+    name:
+      - "kubelet={{ k8s_pkg_version }}"
+      - "kubeadm={{ k8s_pkg_version }}"
+      - "kubectl={{ k8s_pkg_version }}"
+    state: present
+    update_cache: true
+
+- name: Hold Kubernetes packages
+  ansible.builtin.dpkg_selections:
+    name: "{{ item }}"
+    selection: hold
+  loop: [kubelet, kubeadm, kubectl]
+
+- name: Enable kubelet
+  ansible.builtin.systemd_service:
+    name: kubelet
+    enabled: true
+
+- name: Render kubeadm config
+  ansible.builtin.template:
+    src: kubeadm-config.yaml.j2
+    dest: /etc/kubernetes/kubeadm-config.yaml
+    mode: "0600"
+
+- name: Initialize control plane
+  ansible.builtin.command: kubeadm init --config /etc/kubernetes/kubeadm-config.yaml
+  args:
+    creates: "{{ kubeconfig }}"
+
+- name: Get kube user home
+  ansible.builtin.getent:
+    database: passwd
+    key: "{{ kube_user }}"
+
+- name: Create .kube directories
+  ansible.builtin.file:
+    path: "{{ item.home }}/.kube"
+    state: directory
+    owner: "{{ item.owner }}"
+    mode: "0700"
+  loop:
+    - { home: /root, owner: root }
+    - { home: "{{ ansible_facts.getent_passwd[kube_user][4] }}", owner: "{{ kube_user }}" }
+
+- name: Install kubeconfig for root and kube user
+  ansible.builtin.copy:
+    src: "{{ kubeconfig }}"
+    dest: "{{ item.home }}/.kube/config"
+    remote_src: true
+    owner: "{{ item.owner }}"
+    mode: "0600"
+  loop:
+    - { home: /root, owner: root }
+    - { home: "{{ ansible_facts.getent_passwd[kube_user][4] }}", owner: "{{ kube_user }}" }
+
+- name: Wait for API server
+  kubernetes.core.k8s_info:
+    kind: Node
+    kubeconfig: "{{ kubeconfig }}"
+  register: nodes
+  until: nodes.resources | length > 0
+  retries: 30
+  delay: 5
