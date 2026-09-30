@@ -115,6 +115,7 @@
 | [CLUSTER-001](./cluster-001.md) | `done` |
 | [APP-001](./app-001.md) | `done` |
 | [GW-001](./gw-001.md) | `done` |
+| [MON-001](./mon-001.md) | `done` |
 | [CI-001](./ci-001.md) | `done` |
 
 Статусы в этой таблице справочные — канонические только в `progress_dev.md`.

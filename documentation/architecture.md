@@ -121,9 +121,11 @@ DNS-прокси Default Switch: тот отвечал через раз. IP VM 
 
 | Параметр | Значение |
 |---|---|
-| Способ развёртывания Prometheus | Helm-чарт **kube-prometheus-stack** (D-05): Prometheus Operator, Prometheus, Alertmanager, node-exporter, kube-state-metrics, Grafana; версия ⚠️ фиксируется в MON-001 |
+| Способ развёртывания Prometheus | Helm-чарт **kube-prometheus-stack 91.8.2** (D-05; Prometheus Operator v0.94.1): Prometheus, Alertmanager, node-exporter, kube-state-metrics, Grafana 13.2.3. Values — `helm-values/kube-prometheus-stack.yaml` |
 | Обязательный минимум | хотя бы один target в состоянии `UP` + PromQL-запрос, который возвращает данные |
-| Targets | node-exporter, kube-state-metrics, kubelet/cAdvisor (из коробки); прокси Envoy и контроллер Envoy Gateway (PodMonitor/ServiceMonitor); nginx-exporter (ServiceMonitor) |
+| Targets | 14 jobs, все `UP`: apiserver, kubelet/cAdvisor, node-exporter, kube-state-metrics, coredns, kube-controller-manager, kube-scheduler, kube-etcd, kube-proxy, компоненты стека, **hello** (nginx-exporter 1.5.3, ServiceMonitor). Метрики control plane kubeadm привязаны к адресу узла `10.200.0.10` (по умолчанию — `127.0.0.1`, и targets были бы DOWN). Envoy — MON-002 |
+| Хранение | emptyDir, retention 3 дня / 4 ГБ: в кластере нет StorageClass |
+| Grafana | пароль admin случайный, создаётся один раз в Secret `monitoring/grafana-admin`; пароль чарта по умолчанию не работает |
 | Проверка | `/targets` в Prometheus + конкретные PromQL-запросы с ожидаемым результатом (MON-001) |
 
 Плюсом по кейсу считаются HTTP-метрики (количество запросов, коды ответов,
@@ -238,6 +240,11 @@ VPN без публичного адреса, а self-hosted runner на лич�
   github.com, get.helm.sh; офлайн-установка не поддерживается.
 - Пул IP подов Calico задаётся при первой установке; смена `pod_cidr` на
   существующем кластере не поддерживается, нужна переустановка.
+- Метрики Prometheus хранятся в emptyDir: при пересоздании пода Prometheus
+  история теряется (нет StorageClass; для продакшена нужен PV).
+- Настройки kubeadm (включая адреса метрик control plane) применяются только
+  при создании кластера; на уже созданном кластере их изменение не
+  применяется повторным `deploy.sh`.
 
 ---
 

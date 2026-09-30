@@ -15,7 +15,7 @@
 | 1. Kubernetes-окружение | ✅ | CLUSTER-001 | kubeadm v1.36.5 + containerd 2.2.1 + Calico 3.32.2, 1 узел |
 | 2. Демонстрационное приложение | ✅ | APP-001 | nginx 1.30.5 (non-root), `Hello World! from <pod>`, JSON access-лог |
 | 3. Gateway API | ✅ | GW-001 | Envoy Gateway 1.9.2: GatewayClass → Gateway → HTTPRoute, `curl http://<IP>:30080/` |
-| 4. Мониторинг (Prometheus) | ⬜ | MON-001 | kube-prometheus-stack |
+| 4. Мониторинг (Prometheus) | ✅ | MON-001 | kube-prometheus-stack 91.8.2: 20 targets `UP`, метрики кластера и nginx, PromQL в `make verify` |
 | 5. Логирование (Fluentd / Filebeat) | ⬜ | LOG-001 | Fluentd → Loki → Grafana |
 | 6. Ubuntu 24.04 | ⬜ | QA-001 | Подтверждается прогоном с нуля на чистой VM |
 | 7. Автоматизация развёртывания | ⏳ | AUTO-001 | `sudo ./deploy.sh` → Ansible; кластерная часть готова и идемпотентна |
@@ -26,7 +26,7 @@
 | Возможность | Статус | Задача |
 |---|---|---|
 | Расширенный Gateway API (маршруты, host/path, несколько backend, splitting, TLS) | ⬜ | GW-002 |
-| Grafana: дашборды (кластер, CPU/RAM), метрики и логи Loki в одном окне, доступ через Gateway | ⬜ | GRAF-001 |
+| Grafana: дашборды (кластер, CPU/RAM), метрики и логи Loki в одном окне, доступ через Gateway | ⏳ | GRAF-001 (Grafana и 29 дашбордов уже стоят — MON-001; осталось: Loki, доступ через Gateway) |
 | HTTP-метрики (запросы, коды, latency) + свой дашборд | ⬜ | MON-002 |
 | CI/CD: линты, поиск секретов, развёртывание с нуля на Ubuntu 24.04 (kubeadm) на каждый push | ✅ | CI-001 |
 | Практики надёжности и безопасности | ⬜ | SEC-001 |
@@ -46,7 +46,7 @@
 |---|---|---|
 | Выбор стека D-01…D-08 | ✅ | [architecture.md](./architecture.md), рев. 3 |
 | Хостинг репозитория (GitHub / GitLab) | ⚠️ | Нужен публичный доступ без авторизации до публикации финалистов |
-| Ресурсы стенда под весь стек | ⏳ | Оценка 4–5 ГБ из 8; фактические цифры — в QA-001 |
+| Ресурсы стенда под весь стек | ⏳ | С мониторингом — 3,4 ГБ RAM из 7,8; добавятся Loki и Fluentd |
 
 ## Легенда
 

@@ -38,7 +38,7 @@ APP-001, MON-001.
 | Стенд Ubuntu 24.04 и кластер | ✅ | CLUSTER-001: kubeadm 1.36.5, containerd 2.2.1, Calico 3.32.2, Helm 3.22.0, узел `10.200.0.10`. Снимки VM: `clean-ubuntu-v2`, `cluster-ready-v2` |
 | Приложение | ✅ | APP-001: `demo/hello`, nginx-unprivileged 1.30.5, 2 реплики, JSON-логи, `stub_status` на 8081 |
 | Gateway API | ✅ | GW-001: Envoy Gateway 1.9.2, `GatewayClass eg` → `Gateway gateway/main` (NodePort 30080) → `HTTPRoute demo/hello` |
-| Prometheus | ⬜ | — |
+| Prometheus | ✅ | MON-001: kube-prometheus-stack 91.8.2, 20 targets / 14 jobs `UP` (включая control plane), метрики nginx; Grafana 13.2.3 с 29 дашбордами, случайный пароль admin |
 | Сбор логов | ⬜ | — |
 | Автоматизация (`./deploy.sh`) | ⏳ | Каркас: `deploy.sh` → Ansible (роли node, kubeadm, cni, helm), идемпотентно |
 | CI/CD | ✅ | CI-001: lint + secrets + e2e (kubeadm с нуля на раннере ubuntu-24.04, повтор `changed=0`, verify) — зелёный, e2e 3 мин 31 с |
@@ -66,7 +66,9 @@ Ubuntu 24.04 и частично заменяет ручной QA.
 **GW-001 закрыта** — [gw-001.md](./tasks/gw-001.md): `curl http://<IP>:30080/`
 через Envoy Gateway → `Hello World!`, проверено с Windows-ПК и в CI.
 
-**Дальше:** MON-001 (Prometheus), затем LOG-001 (Fluentd → Loki).
+**MON-001 закрыта** (01.10.2026) — [mon-001.md](./tasks/mon-001.md). Весь стек с нуля на VM — 413 с, в CI e2e — 4 мин 38 с; повторный запуск `changed=0`.
+
+**Дальше:** LOG-001 (Fluentd → Loki), затем GRAF-001.
 
 ## Очередь выполнения
 
@@ -83,7 +85,7 @@ Ubuntu 24.04 и частично заменяет ручной QA.
 |---:|---|---|---|---|
 | 30 | [APP-001](./tasks/app-001.md) | `done` | CLUSTER-001 | Приложение в кластере отвечает `Hello World!` изнутри кластера, access-логи в stdout |
 | 40 | [GW-001](./tasks/gw-001.md) | `done` | APP-001 | Контроллер Gateway API, `GatewayClass`, `Gateway`, `HTTPRoute`; `curl` на Gateway → `Hello World!` |
-| 50 | MON-001 | `ready` | CLUSTER-001 | Prometheus развёрнут, минимум один target `UP`, PromQL-запрос возвращает данные |
+| 50 | [MON-001](./tasks/mon-001.md) | `done` | CLUSTER-001 | Prometheus развёрнут, минимум один target `UP`, PromQL-запрос возвращает данные |
 | 60 | LOG-001 | `ready` | APP-001 | Fluentd или Filebeat собирает логи приложения; запрос с уникальной меткой находится в хранилище |
 | 70 | AUTO-001 | `planned` | GW-001, MON-001, LOG-001 | Одна команда разворачивает всё с нуля; повторный запуск не ломает состояние; `make verify` проходит |
 | 80 | QA-001 | `planned` | AUTO-001 | Прогон по инструкции на чистой Ubuntu 24.04: развёртывание + все проверки, время и ресурсы записаны |
