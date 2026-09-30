@@ -141,10 +141,10 @@ latency), CPU/RAM и дашборды. CPU/RAM и дашборды класте�
 | Параметр | Значение |
 |---|---|
 | Коллектор | **Fluentd** (D-06) — именно Fluentd, не Fluent Bit: кейс называет Fluentd или Filebeat |
-| Способ запуска | DaemonSet на каждом узле, чтение логов контейнеров |
-| Хранилище / точка назначения | **Loki** (single binary, хранение в файловой системе) через плагин `fluent-plugin-grafana-loki`; просмотр и поиск — в Grafana (datasource Loki). Образ Fluentd с плагином ⚠️ уточняется в LOG-001: готовый публичный или сборка из Dockerfile в репозитории |
-| Какие логи | access- и error-логи приложения, минимум |
-| Проверка | запрос с уникальной меткой (например, `?trace=<uuid>` или заголовок) → поиск этой метки в хранилище |
+| Способ запуска | DaemonSet `logging/fluentd`, образ `grafana/fluent-plugin-loki:3.7.8` (Fluentd 1.19.0 + `out_loki`): читает `/var/log/containers/*.log` (CRI), метки `namespace`/`pod`/`container`/`stream` берёт из имени файла, JSON nginx разбирает в поля, буфер — на диске узла (`/var/log/fluentd`) |
+| Хранилище / точка назначения | **Loki 3.6.11** (чарт `grafana/loki` 7.3.0), single binary, файловая система на emptyDir, retention 72 ч; `http://loki.logging:3100`. Просмотр — Grafana (GRAF-001) и LogQL API |
+| Какие логи | все контейнеры кластера (централизованное хранение); access-лог nginx — разобранный JSON, error-лог — stderr |
+| Проверка | `verify.sh`: запрос `?trace=<uuid>` через Gateway → LogQL `{namespace="demo",container="nginx"} \|= "<uuid>" \| json \| status="200"` |
 
 Проверку с уникальной меткой заложить сразу: кейс требует показать, что
 *именно этот* запрос появился в логах, а не просто что логи есть.
@@ -240,8 +240,10 @@ VPN без публичного адреса, а self-hosted runner на лич�
   github.com, get.helm.sh; офлайн-установка не поддерживается.
 - Пул IP подов Calico задаётся при первой установке; смена `pod_cidr` на
   существующем кластере не поддерживается, нужна переустановка.
-- Метрики Prometheus хранятся в emptyDir: при пересоздании пода Prometheus
+- Метрики Prometheus и логи Loki хранятся в emptyDir: при пересоздании пода
   история теряется (нет StorageClass; для продакшена нужен PV).
+- Fluentd работает от root (uid 0) — файлы логов контейнеров принадлежат root;
+  capabilities сброшены, повышение привилегий запрещено.
 - Настройки kubeadm (включая адреса метрик control plane) применяются только
   при создании кластера; на уже созданном кластере их изменение не
   применяется повторным `deploy.sh`.

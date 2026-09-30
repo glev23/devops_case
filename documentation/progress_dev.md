@@ -39,7 +39,7 @@ APP-001, MON-001.
 | Приложение | ✅ | APP-001: `demo/hello`, nginx-unprivileged 1.30.5, 2 реплики, JSON-логи, `stub_status` на 8081 |
 | Gateway API | ✅ | GW-001: Envoy Gateway 1.9.2, `GatewayClass eg` → `Gateway gateway/main` (NodePort 30080) → `HTTPRoute demo/hello` |
 | Prometheus | ✅ | MON-001: kube-prometheus-stack 91.8.2, 20 targets / 14 jobs `UP` (включая control plane), метрики nginx; Grafana 13.2.3 с 29 дашбордами, случайный пароль admin |
-| Сбор логов | ⬜ | — |
+| Сбор логов | ✅ | LOG-001: Fluentd (DaemonSet) → Loki 3.6; логи всех namespace, JSON nginx разобран; запрос с меткой находится по LogQL |
 | Автоматизация (`./deploy.sh`) | ⏳ | Каркас: `deploy.sh` → Ansible (роли node, kubeadm, cni, helm), идемпотентно |
 | CI/CD | ✅ | CI-001: lint + secrets + e2e (kubeadm с нуля на раннере ubuntu-24.04, повтор `changed=0`, verify) — зелёный, e2e 3 мин 31 с |
 | Материалы сдачи | ⬜ | — |
@@ -68,7 +68,9 @@ Ubuntu 24.04 и частично заменяет ручной QA.
 
 **MON-001 закрыта** (01.10.2026) — [mon-001.md](./tasks/mon-001.md). Весь стек с нуля на VM — 413 с, в CI e2e — 4 мин 38 с; повторный запуск `changed=0`.
 
-**Дальше:** LOG-001 (Fluentd → Loki), затем GRAF-001.
+**LOG-001 закрыта** (01.10.2026) — [log-001.md](./tasks/log-001.md). Все обязательные технические части (пп. 1–5 кейса) работают и проверяются в CI.
+
+**Дальше:** GRAF-001 (Loki в Grafana, доступ через Gateway), GW-002, MON-002, SEC-001; затем AUTO-001/QA-001 и материалы сдачи.
 
 ## Очередь выполнения
 
@@ -86,7 +88,7 @@ Ubuntu 24.04 и частично заменяет ручной QA.
 | 30 | [APP-001](./tasks/app-001.md) | `done` | CLUSTER-001 | Приложение в кластере отвечает `Hello World!` изнутри кластера, access-логи в stdout |
 | 40 | [GW-001](./tasks/gw-001.md) | `done` | APP-001 | Контроллер Gateway API, `GatewayClass`, `Gateway`, `HTTPRoute`; `curl` на Gateway → `Hello World!` |
 | 50 | [MON-001](./tasks/mon-001.md) | `done` | CLUSTER-001 | Prometheus развёрнут, минимум один target `UP`, PromQL-запрос возвращает данные |
-| 60 | LOG-001 | `ready` | APP-001 | Fluentd или Filebeat собирает логи приложения; запрос с уникальной меткой находится в хранилище |
+| 60 | [LOG-001](./tasks/log-001.md) | `done` | APP-001 | Fluentd или Filebeat собирает логи приложения; запрос с уникальной меткой находится в хранилище |
 | 70 | AUTO-001 | `planned` | GW-001, MON-001, LOG-001 | Одна команда разворачивает всё с нуля; повторный запуск не ломает состояние; `make verify` проходит |
 | 80 | QA-001 | `planned` | AUTO-001 | Прогон по инструкции на чистой Ubuntu 24.04: развёртывание + все проверки, время и ресурсы записаны |
 
@@ -95,8 +97,8 @@ Ubuntu 24.04 и частично заменяет ручной QA.
 | № | Задача | Статус | Зависимости | Законченный результат |
 |---:|---|---|---|---|
 | 90 | GW-002 | `ready` | GW-001 | Маршруты по host и path, несколько backend, traffic splitting по весам, TLS — у каждого есть `curl`-проверка |
-| 95 | GRAF-001 | `planned` | MON-001, LOG-001, GW-001 | Grafana из kube-prometheus-stack: datasources Prometheus + Loki, готовые дашборды кластера (CPU/RAM), доступ через Gateway (`HTTPRoute`), пароль admin — из сгенерированного Secret, не из репозитория |
-| 100 | MON-002 | `planned` | MON-001, GW-001, GRAF-001 | HTTP-метрики Envoy (запросы, коды, latency) + свой дашборд JSON в репозитории |
+| 95 | GRAF-001 | `ready` | MON-001, LOG-001, GW-001 | Grafana из kube-prometheus-stack: datasources Prometheus + Loki, готовые дашборды кластера (CPU/RAM), доступ через Gateway (`HTTPRoute`), пароль admin — из сгенерированного Secret, не из репозитория |
+| 100 | MON-002 | `ready` | MON-001, GW-001, GRAF-001 | HTTP-метрики Envoy (запросы, коды, latency) + свой дашборд JSON в репозитории |
 | 110 | SEC-001 | `planned` | APP-001 | requests/limits, probes, securityContext, реплики + PDB, NetworkPolicy |
 | 120 | [CI-001](./tasks/ci-001.md) | `done` | CLUSTER-001, APP-001 | lint + gitleaks + e2e: `deploy.sh` с нуля на раннере ubuntu-24.04 (kubeadm), повтор с `changed=0`, `verify.sh` |
 
