@@ -57,6 +57,31 @@ spec:
               readOnly: true
             - name: tmp
               mountPath: /tmp
+        # Метрики nginx для Prometheus: читает stub_status на localhost:8081
+        - name: exporter
+          image: nginx/nginx-prometheus-exporter:1.5.3
+          args:
+            - --nginx.scrape-uri=http://127.0.0.1:8081/stub_status
+          ports:
+            - name: metrics
+              containerPort: 9113
+          readinessProbe:
+            httpGet:
+              path: /metrics
+              port: metrics
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 5m
+              memory: 16Mi
+            limits:
+              cpu: 100m
+              memory: 32Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
       volumes:
         - name: config
           configMap:

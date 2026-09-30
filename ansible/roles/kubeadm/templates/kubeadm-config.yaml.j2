@@ -18,7 +18,27 @@ controlPlaneEndpoint: {{ node_ip }}:6443
 networking:
   podSubnet: {{ pod_cidr }}
   serviceSubnet: {{ service_cidr }}
+# Метрики control plane слушают адрес узла, а не 127.0.0.1 (по умолчанию в
+# kubeadm): иначе Prometheus видит их targets как DOWN. Адрес узла стабильный
+# и снаружи VM недоступен (dummy-интерфейс).
+controllerManager:
+  extraArgs:
+    - name: bind-address
+      value: {{ node_ip }}
+scheduler:
+  extraArgs:
+    - name: bind-address
+      value: {{ node_ip }}
+etcd:
+  local:
+    extraArgs:
+      - name: listen-metrics-urls
+        value: http://127.0.0.1:2381,http://{{ node_ip }}:2381
 ---
 apiVersion: kubelet.config.k8s.io/v1beta1
 kind: KubeletConfiguration
 cgroupDriver: systemd
+---
+apiVersion: kubeproxy.config.k8s.io/v1alpha1
+kind: KubeProxyConfiguration
+metricsBindAddress: {{ node_ip }}:10249

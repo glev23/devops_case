@@ -1,0 +1,74 @@
+# kube-prometheus-stack: Prometheus Operator, Prometheus, Alertmanager,
+# node-exporter, kube-state-metrics, Grafana.
+# Короткие имена ресурсов: kps-prometheus, kps-alertmanager, kps-grafana.
+fullnameOverride: kps
+
+windowsMonitoring:
+  enabled: false
+
+prometheus:
+  prometheusSpec:
+    scrapeInterval: 30s
+    evaluationInterval: 30s
+    # Хранилище — emptyDir (в кластере kubeadm нет StorageClass по умолчанию):
+    # данные живут, пока жив под. Ограничения — в architecture.md §12.
+    retention: 3d
+    retentionSize: 4GB
+    # Подхватывать ServiceMonitor/PodMonitor/правила из любых namespace,
+    # а не только с меткой release этого чарта
+    serviceMonitorSelectorNilUsesHelmValues: false
+    podMonitorSelectorNilUsesHelmValues: false
+    ruleSelectorNilUsesHelmValues: false
+    probeSelectorNilUsesHelmValues: false
+    resources:
+      requests:
+        cpu: 100m
+        memory: 400Mi
+      limits:
+        memory: 1500Mi
+
+alertmanager:
+  alertmanagerSpec:
+    resources:
+      requests:
+        cpu: 10m
+        memory: 32Mi
+      limits:
+        memory: 128Mi
+
+grafana:
+  # Пароль admin — из Secret grafana-admin, который Ansible создаёт один раз
+  # со случайным паролем (не пароль чарта по умолчанию и не из репозитория)
+  admin:
+    existingSecret: grafana-admin
+    userKey: admin-user
+    passwordKey: admin-password
+  defaultDashboardsTimezone: browser
+  resources:
+    requests:
+      cpu: 20m
+      memory: 128Mi
+    limits:
+      memory: 384Mi
+
+# kubeadm: etcd отдаёт метрики по HTTP на 2381 (см. kubeadm-config.yaml.j2)
+kubeEtcd:
+  service:
+    port: 2381
+    targetPort: 2381
+
+kube-state-metrics:
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      memory: 128Mi
+
+prometheus-node-exporter:
+  resources:
+    requests:
+      cpu: 10m
+      memory: 24Mi
+    limits:
+      memory: 64Mi

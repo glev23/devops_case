@@ -102,6 +102,57 @@ else
   fail "запрос $gw_trace через Gateway не найден в логе nginx"
 fi
 
+section "Мониторинг (Prometheus)"
+PROM_URL="http://kps-prometheus.monitoring:9090/api/v1/query"
+# Все PromQL-запросы одним подом; каждый ответ — одна JSON-строка
+prom_out=$(in_cluster "
+  for q in 'count(up == 0) or vector(0)' 'count(up)' 'sum by (job) (up)' 'sum(nginx_http_requests_total)'; do
+    curl -s -m 10 -G '$PROM_URL' --data-urlencode \"query=\$q\"; echo
+  done")
+prom_parsed=$(python3 - "$prom_out" <<'PY'
+import json, sys
+lines = [l for l in sys.argv[1].splitlines() if l.startswith('{')]
+def vals(i):
+    try:
+        return json.loads(lines[i])['data']['result']
+    except Exception:
+        return None
+down, total, jobs, reqs = (vals(i) for i in range(4))
+print('down', down[0]['value'][1] if down else 'ERR')
+print('total', total[0]['value'][1] if total else 'ERR')
+print('jobs', ' '.join(sorted(r['metric'].get('job', '?') for r in (jobs or []) if float(r['value'][1]) > 0)))
+print('reqs', reqs[0]['value'][1] if reqs else 'ERR')
+PY
+)
+get() { awk -v k="$1" '$1 == k { $1 = ""; sub(/^ /, ""); print }' <<< "$prom_parsed"; }
+
+if [[ $(get total) =~ ^[0-9]+$ ]]; then
+  ok "Prometheus отвечает, targets: $(get total)"
+else
+  fail "Prometheus API не ответил"
+fi
+if [[ $(get down) == 0 ]]; then
+  ok "нет targets в состоянии DOWN (count(up == 0) = 0)"
+else
+  fail "есть targets в состоянии DOWN: $(get down)"
+fi
+jobs=" $(get jobs) "
+missing=""
+for job in apiserver kubelet node-exporter kube-state-metrics coredns kube-controller-manager kube-scheduler kube-etcd kube-proxy hello; do
+  [[ $jobs == *" $job "* ]] || missing+=" $job"
+done
+if [[ -z $missing ]]; then
+  ok "targets UP:$jobs"
+else
+  fail "targets отсутствуют или DOWN:$missing"
+fi
+reqs=$(get reqs)
+if [[ $reqs =~ ^[0-9.]+$ ]] && awk -v r="$reqs" 'BEGIN { exit !(r > 0) }'; then
+  ok "PromQL sum(nginx_http_requests_total) = $reqs (метрики приложения)"
+else
+  fail "метрики nginx не получены (sum(nginx_http_requests_total) = ${reqs:-<пусто>})"
+fi
+
 echo
 if [[ $failed -eq 0 ]]; then
   printf '\033[32mВсе проверки пройдены\033[0m\n'

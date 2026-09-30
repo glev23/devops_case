@@ -13,6 +13,7 @@
   become: true
   roles:
     - gateway
+    - monitoring
 
 - name: Workloads
   hosts: k8s

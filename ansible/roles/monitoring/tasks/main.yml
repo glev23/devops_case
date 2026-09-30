@@ -1,0 +1,50 @@
+---
+# kube-prometheus-stack (Prometheus, Alertmanager, Grafana, экспортеры).
+
+- name: Create monitoring namespace
+  kubernetes.core.k8s:
+    kubeconfig: "{{ kubeconfig }}"
+    api_version: v1
+    kind: Namespace
+    name: monitoring
+    state: present
+
+- name: Check Grafana admin secret
+  kubernetes.core.k8s_info:
+    kubeconfig: "{{ kubeconfig }}"
+    kind: Secret
+    namespace: monitoring
+    name: grafana-admin
+  register: monitoring_grafana_secret
+
+# Пароль генерируется один раз при первой установке и в репозиторий не попадает.
+# Посмотреть: kubectl -n monitoring get secret grafana-admin -o jsonpath='{.data.admin-password}' | base64 -d
+- name: Create Grafana admin secret with random password
+  kubernetes.core.k8s:
+    kubeconfig: "{{ kubeconfig }}"
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: grafana-admin
+        namespace: monitoring
+      type: Opaque
+      stringData:
+        admin-user: admin
+        admin-password: "{{ lookup('ansible.builtin.password', '/dev/null', length=24, chars=['ascii_letters', 'digits']) }}"
+  when: monitoring_grafana_secret.resources | length == 0
+  no_log: true
+
+- name: Install kube-prometheus-stack
+  kubernetes.core.helm:
+    kubeconfig: "{{ kubeconfig }}"
+    release_name: kps
+    release_namespace: monitoring
+    chart_repo_url: https://prometheus-community.github.io/helm-charts
+    chart_ref: kube-prometheus-stack
+    chart_version: "{{ kube_prometheus_stack_version }}"
+    values_files:
+      - "{{ repo_root }}/helm-values/kube-prometheus-stack.yaml"
+    wait: true
+    wait_timeout: 15m
