@@ -19,6 +19,9 @@
       - "kubectl={{ k8s_pkg_version }}"
     state: present
     update_cache: true
+    # Закреплённая версия — источник правды: более новый kubectl (например,
+    # предустановленный) понижается до версии кластера
+    allow_downgrade: true
 
 - name: Hold Kubernetes packages
   ansible.builtin.dpkg_selections:

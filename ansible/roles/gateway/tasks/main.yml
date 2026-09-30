@@ -1,0 +1,28 @@
+---
+# Envoy Gateway (реализация Gateway API) + GatewayClass/Gateway из deploy/gateway.
+
+- name: Install Envoy Gateway
+  kubernetes.core.helm:
+    kubeconfig: "{{ kubeconfig }}"
+    release_name: eg
+    release_namespace: envoy-gateway-system
+    create_namespace: true
+    chart_ref: oci://docker.io/envoyproxy/gateway-helm
+    chart_version: "{{ envoy_gateway_version }}"
+    wait: true
+    wait_timeout: 10m
+
+- name: Apply GatewayClass, EnvoyProxy and Gateway
+  ansible.builtin.command: kubectl apply -k {{ repo_root }}/deploy/gateway
+  environment:
+    KUBECONFIG: "{{ kubeconfig }}"
+  register: gateway_apply
+  changed_when: gateway_apply.stdout is search(' (created|configured)')
+
+- name: Wait for Gateway to be programmed
+  ansible.builtin.command: >
+    kubectl -n gateway wait gateway/main
+    --for=condition=Programmed --timeout=300s
+  environment:
+    KUBECONFIG: "{{ kubeconfig }}"
+  changed_when: false

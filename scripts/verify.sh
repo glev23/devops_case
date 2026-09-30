@@ -57,6 +57,51 @@ else
   fail "запрос $trace не найден в access-логе приложения"
 fi
 
+section "Gateway API (Envoy Gateway)"
+# cond <условие> <kubectl get args...> → статус условия (True/False/пусто)
+cond() {
+  local type=$1; shift
+  kubectl get "$@" -o jsonpath='{.status.conditions[?(@.type=="'"$type"'")].status}' 2>/dev/null
+}
+if [[ $(cond Accepted gatewayclass eg) == True ]]; then
+  ok "GatewayClass eg: Accepted"
+else
+  fail "GatewayClass eg не Accepted"
+fi
+if [[ $(cond Programmed -n gateway gateway main) == True ]]; then
+  ok "Gateway gateway/main: Programmed"
+else
+  fail "Gateway gateway/main не Programmed"
+fi
+route_status() {
+  kubectl -n demo get httproute hello \
+    -o jsonpath='{.status.parents[0].conditions[?(@.type=="'"$1"'")].status}' 2>/dev/null
+}
+if [[ $(route_status Accepted) == True && $(route_status ResolvedRefs) == True ]]; then
+  ok "HTTPRoute demo/hello: Accepted, ResolvedRefs"
+else
+  fail "HTTPRoute demo/hello не принят Gateway"
+fi
+
+# Снаружи кластера: NodePort прокси Envoy на основном IP узла.
+# Можно переопределить: GATEWAY_URL=http://<IP>:30080 ./scripts/verify.sh
+GATEWAY_URL="${GATEWAY_URL:-http://$(hostname -I | awk '{print $1}'):30080}"
+gw_trace="verify-gw-$(date +%s)-$RANDOM"
+gw_body=$(curl -s -m 5 "$GATEWAY_URL/?trace=$gw_trace" || true)
+if [[ "$gw_body" == "Hello World! from hello-"* ]]; then
+  ok "curl $GATEWAY_URL/ → $gw_body"
+else
+  fail "curl $GATEWAY_URL/ вернул: ${gw_body:-<нет ответа>}"
+fi
+
+sleep 2
+gw_hits=$(kubectl -n demo logs -l app.kubernetes.io/name=hello --tail=200 | grep "$gw_trace" | grep -c '"x_forwarded_for":"[0-9]' || true)
+if [[ $gw_hits -ge 1 ]]; then
+  ok "запрос через Gateway дошёл до nginx (в логе есть X-Forwarded-For от Envoy)"
+else
+  fail "запрос $gw_trace через Gateway не найден в логе nginx"
+fi
+
 echo
 if [[ $failed -eq 0 ]]; then
   printf '\033[32mВсе проверки пройдены\033[0m\n'

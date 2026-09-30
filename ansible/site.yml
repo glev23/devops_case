@@ -8,6 +8,12 @@
     - cni
     - helm
 
+- name: Platform
+  hosts: k8s
+  become: true
+  roles:
+    - gateway
+
 - name: Workloads
   hosts: k8s
   become: true

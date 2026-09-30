@@ -12,6 +12,7 @@ rm -rf /etc/containerd /var/lib/containerd
 ip link delete docker0 2>/dev/null || true
 
 echo "==> Удаление предустановленных kubectl/kind (ставятся нашим playbook)"
+apt-get purge -y -qq kubectl 2>/dev/null || true
 rm -f /usr/local/bin/kubectl /usr/local/bin/kind
 
 echo "==> Свободно: $(free -h | awk '/Mem/ {print $7}') RAM, $(df -h / | awk 'NR==2 {print $4}') диска"

@@ -21,6 +21,9 @@ node_ip: "{{ node_stable_ip if node_stable_ip | length > 0 else ansible_default_
 # CNI
 calico_version: "v3.32.2"
 
+# Gateway API: Envoy Gateway (чарт несёт CRD Gateway API v1.6.1)
+envoy_gateway_version: "v1.9.2"
+
 # Helm (ветка 3: модули kubernetes.core рассчитаны на Helm 3)
 helm_version: "v3.22.0"
 

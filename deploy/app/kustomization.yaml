@@ -11,6 +11,7 @@ resources:
   - namespace.yaml
   - deployment.yaml
   - service.yaml
+  - httproute.yaml
 
 # Хэш в имени ConfigMap: изменение nginx.conf само перезапускает поды
 configMapGenerator:

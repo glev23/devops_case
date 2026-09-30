@@ -1,0 +1,20 @@
+# Параметры прокси для GatewayClass eg: на bare-metal нет облачного
+# LoadBalancer, поэтому прокси публикуется через NodePort с фиксированным портом.
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: EnvoyProxy
+metadata:
+  name: nodeport
+  namespace: envoy-gateway-system
+spec:
+  provider:
+    type: Kubernetes
+    kubernetes:
+      envoyService:
+        type: NodePort
+        patch:
+          type: StrategicMerge
+          value:
+            spec:
+              ports:
+                - port: 80
+                  nodePort: 30080
