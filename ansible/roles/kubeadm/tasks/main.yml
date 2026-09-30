@@ -1,26 +1,15 @@
 ---
 # kubelet/kubeadm/kubectl закреплённой версии и kubeadm init (только если кластера нет).
 
-- name: Create apt keyrings directory
-  ansible.builtin.file:
-    path: /etc/apt/keyrings
-    state: directory
-    mode: "0755"
-
-- name: Add Kubernetes apt key
-  ansible.builtin.shell: >
-    curl -fsSL https://pkgs.k8s.io/core:/stable:/v{{ k8s_minor }}/deb/Release.key
-    | gpg --dearmor -o /etc/apt/keyrings/kubernetes-{{ k8s_minor }}.gpg
-  args:
-    creates: /etc/apt/keyrings/kubernetes-{{ k8s_minor }}.gpg
-
+# deb822: один файл kubernetes.sources с репозиторием и ключом (модуль сам
+# скачивает ключ по URL); смена версии перезаписывает файл, а не дописывает.
 - name: Add Kubernetes apt repository
-  ansible.builtin.apt_repository:
-    repo: >-
-      deb [signed-by=/etc/apt/keyrings/kubernetes-{{ k8s_minor }}.gpg]
-      https://pkgs.k8s.io/core:/stable:/v{{ k8s_minor }}/deb/ /
-    filename: kubernetes
-    state: present
+  ansible.builtin.deb822_repository:
+    name: kubernetes
+    types: deb
+    uris: "https://pkgs.k8s.io/core:/stable:/v{{ k8s_minor }}/deb/"
+    suites: /
+    signed_by: "https://pkgs.k8s.io/core:/stable:/v{{ k8s_minor }}/deb/Release.key"
 
 - name: Install kubelet, kubeadm, kubectl
   ansible.builtin.apt:
@@ -83,7 +72,7 @@
   kubernetes.core.k8s_info:
     kind: Node
     kubeconfig: "{{ kubeconfig }}"
-  register: nodes
-  until: nodes.resources | length > 0
+  register: kubeadm_nodes
+  until: kubeadm_nodes.resources | length > 0
   retries: 30
   delay: 5

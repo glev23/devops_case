@@ -13,12 +13,15 @@ if [[ $EUID -ne 0 ]]; then
   exit 1
 fi
 
-if ! command -v ansible-playbook >/dev/null 2>&1; then
-  echo "==> Установка Ansible"
+# Всегда Ansible из репозитория Ubuntu 24.04 (ansible-core 2.16 + коллекции
+# kubernetes.core, community.general, ansible.posix), а не случайный из PATH:
+# так набор модулей и их версии одинаковы на любой машине.
+if ! dpkg-query -W -f='${Status}' ansible 2>/dev/null | grep -q "install ok installed"; then
+  echo "==> Установка Ansible из репозитория Ubuntu"
   export DEBIAN_FRONTEND=noninteractive
   apt-get update -qq
   apt-get install -y -qq ansible >/dev/null
 fi
 
 cd ansible
-exec ansible-playbook site.yml "$@"
+exec /usr/bin/ansible-playbook site.yml "$@"

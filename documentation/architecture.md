@@ -210,12 +210,19 @@ PodDisruptionBudget, NetworkPolicy, отдельные namespaces по комп�
 
 ## 11. CI/CD (по желанию)
 
-GitHub Actions (D-08): yamllint, ansible-lint, shellcheck; kubeconform для
-манифестов после `kustomize build`; `helm template` с нашими values;
-gitleaks — поиск секретов (критерий 4); smoke-деплой в kind (приложение +
-Envoy Gateway + `curl`). kind в CI выбран сознательно: он быстро проверяет
-Kubernetes-слой, а путь через kubeadm подтверждается прогоном QA-001 на
-Ubuntu 24.04.
+GitHub Actions (D-08), `.github/workflows/ci.yml`, на каждый push в `main` и
+pull request:
+
+| Job | Что делает |
+|---|---|
+| `lint` | yamllint `--strict`, ansible-lint (профиль `production`), shellcheck, `kubectl kustomize` + kubeconform для `deploy/*` |
+| `secrets` | gitleaks по всей истории git (критерий 4) |
+| `e2e` | GitHub-раннер `ubuntu-24.04` приводится к чистой Ubuntu (`ci/prepare-runner.sh`), затем **тот же `sudo ./deploy.sh`, что у эксперта**: kubeadm с нуля → повторный запуск (job падает, если `changed` ≠ 0) → `scripts/verify.sh` |
+
+**CD.** Роль CD выполняет `e2e`: каждый коммит автоматически разворачивается
+в эфемерное окружение и проверяется. На наш стенд автодеплоя нет: VM за NAT и
+VPN без публичного адреса, а self-hosted runner на личном ПК при публичном
+репозитории — риск безопасности.
 
 ---
 
@@ -256,6 +263,16 @@ Ubuntu 24.04.
 
 ## История решений
 
+**[30.09.2026] CI: полный kubeadm на GitHub-раннере вместо kind.** Раннер
+`ubuntu-24.04` — это полноценная VM с sudo, поэтому `e2e` гоняет весь
+`deploy.sh` с нуля. Это автоматически подтверждает сразу три критерия:
+воспроизводимость, идемпотентность и работу на Ubuntu 24.04. kind проверил
+бы только Kubernetes-слой. Раннер перед запуском очищается от Docker и его
+containerd: он конфликтует с пакетом `containerd` из Ubuntu. Заодно
+`deploy.sh` теперь всегда берёт Ansible из репозитория Ubuntu (детерминированный
+набор коллекций), а репозиторий Kubernetes подключается через
+`deb822_repository` (файл перезаписывается, а не дописывается).
+
 **[30.09.2026] Стабильный адрес узла.** На первом прогоне CLUSTER-001
 кластер переставал работать после перезагрузки VM: Default Switch выдал
 новый IP по DHCP, а kubeadm вшивает адрес узла в сертификаты API-сервера и
@@ -285,7 +302,8 @@ Switch меняется после перезагрузки Windows) и пере
 - **D-07 Makefile + Ansible + Helm + Kustomize.** Ansible покрывает подготовку
   ОС и kubeadm, идемпотентность видна по `changed=0` на повторном прогоне.
   Эксперту достаточно `make deploy`.
-- **D-08 GitHub Actions.** Линты, валидация, поиск секретов, smoke в kind.
+- **D-08 GitHub Actions.** Линты, валидация, поиск секретов, smoke в kind
+  (уточнено 30.09: вместо kind — полный kubeadm на раннере, см. ниже).
 - **Стенд.** Для работы через WireGuard `AllowedIPs` заменён на
   `0.0.0.0/1, 128.0.0.0/1` (без kill-switch), в VM выставлен MTU 1400 (§2).
 

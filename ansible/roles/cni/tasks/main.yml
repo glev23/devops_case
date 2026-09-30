@@ -36,14 +36,14 @@
     api_version: operator.tigera.io/v1
     kind: Installation
     name: default
-  register: calico_installation
+  register: cni_installation
 
 - name: Configure Calico installation
   kubernetes.core.k8s:
     kubeconfig: "{{ kubeconfig }}"
     state: present
     template: installation.yaml.j2
-  when: calico_installation.resources | length == 0
+  when: cni_installation.resources | length == 0
 
 - name: Wait for node Ready
   kubernetes.core.k8s_info:

@@ -1,0 +1,122 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# shell: bash включает pipefail: падение deploy.sh в `| tee` не маскируется
+defaults:
+  run:
+    shell: bash
+
+env:
+  KUBECONFORM_VERSION: v0.8.0
+  GITLEAKS_VERSION: 8.30.1
+
+jobs:
+  lint:
+    name: Lint and validate
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Install linters
+        run: |
+          pip install --quiet yamllint==1.38.0 ansible-lint==26.9.0
+          ansible-galaxy collection install --upgrade kubernetes.core community.general ansible.posix
+
+      - name: yamllint
+        run: yamllint --strict .
+
+      - name: ansible-lint
+        run: ansible-lint ansible/
+
+      - name: shellcheck
+        run: shellcheck deploy.sh scripts/*.sh ci/*.sh
+
+      - name: Kustomize build + kubeconform
+        run: |
+          curl -sSL "https://github.com/yannh/kubeconform/releases/download/${KUBECONFORM_VERSION}/kubeconform-linux-amd64.tar.gz" \
+            | tar xz -C /usr/local/bin kubeconform
+          for dir in deploy/*/; do
+            echo "::group::$dir"
+            kubectl kustomize "$dir" | kubeconform -strict -summary \
+              -schema-location default \
+              -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json'
+            echo "::endgroup::"
+          done
+
+  secrets:
+    name: Secret scan
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: gitleaks
+        run: |
+          curl -sSL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
+            | tar xz -C /usr/local/bin gitleaks
+          gitleaks git --redact --verbose .
+
+  e2e:
+    name: Deploy from scratch on Ubuntu 24.04 (kubeadm)
+    needs: [lint, secrets]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Prepare runner as clean Ubuntu 24.04
+        run: sudo ./ci/prepare-runner.sh
+
+      - name: Deploy (first run)
+        run: sudo ./deploy.sh | tee deploy-1.log
+
+      - name: Deploy again — must change nothing (idempotency)
+        run: |
+          sudo ./deploy.sh | tee deploy-2.log
+          recap=$(grep -A1 'PLAY RECAP' deploy-2.log | grep -Eo 'changed=[0-9]+' | sort -u)
+          echo "Recap: $recap"
+          if [ "$recap" != "changed=0" ]; then
+            echo "::error::Повторный запуск изменил систему ($recap)"
+            grep -B3 -E '^changed:' deploy-2.log || true
+            exit 1
+          fi
+
+      - name: Verify
+        run: ./scripts/verify.sh
+
+      - name: Collect diagnostics
+        if: failure()
+        run: |
+          mkdir -p diag
+          sudo cp deploy-*.log diag/ 2>/dev/null || true
+          kubectl get pods -A -o wide > diag/pods.txt 2>&1 || true
+          kubectl get events -A --sort-by=.lastTimestamp > diag/events.txt 2>&1 || true
+          kubectl describe pods -A > diag/describe-pods.txt 2>&1 || true
+          sudo journalctl -u kubelet --no-pager -n 500 > diag/kubelet.txt 2>&1 || true
+          sudo journalctl -u containerd --no-pager -n 300 > diag/containerd.txt 2>&1 || true
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: e2e-logs
+          path: |
+            deploy-*.log
+            diag/
+          if-no-files-found: ignore
