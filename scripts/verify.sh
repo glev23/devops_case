@@ -153,6 +153,39 @@ else
   fail "метрики nginx не получены (sum(nginx_http_requests_total) = ${reqs:-<пусто>})"
 fi
 
+section "Логирование (Fluentd → Loki)"
+fluentd_ready=$(kubectl -n logging get ds fluentd -o jsonpath='{.status.numberReady}/{.status.desiredNumberScheduled}' 2>/dev/null || true)
+if [[ -n $fluentd_ready && ${fluentd_ready%/*} == "${fluentd_ready#*/}" && ${fluentd_ready%/*} -ge 1 ]]; then
+  ok "Fluentd DaemonSet готов ($fluentd_ready)"
+else
+  fail "Fluentd DaemonSet не готов (${fluentd_ready:-нет})"
+fi
+
+# Ищем в Loki тот самый запрос, что прошёл через Gateway ($gw_trace).
+# LogQL: поток nginx из namespace demo → строка с меткой → разбор JSON → status 200.
+LOKI_URL="http://loki.logging:3100/loki/api/v1/query_range"
+LOGQL="{namespace=\"demo\",container=\"nginx\"} |= \"$gw_trace\" | json | status=\"200\""
+loki_line=""
+for _ in 1 2 3 4 5 6; do
+  loki_out=$(in_cluster "curl -s -m 10 -G '$LOKI_URL' --data-urlencode 'since=15m' --data-urlencode 'query=$LOGQL'")
+  loki_line=$(python3 -c '
+import json, sys
+try:
+    res = json.loads(sys.argv[1])["data"]["result"]
+    print(res[0]["values"][0][1] if res else "")
+except Exception:
+    print("")
+' "$(grep -m1 '^{' <<< "$loki_out" || true)")
+  [[ -n $loki_line ]] && break
+  sleep 5
+done
+if [[ -n $loki_line ]]; then
+  ok "запрос $gw_trace найден в Loki (LogQL: {namespace=\"demo\",container=\"nginx\"} |= \"…\" | json | status=\"200\")"
+  echo "      $loki_line"
+else
+  fail "запрос $gw_trace не найден в Loki"
+fi
+
 echo
 if [[ $failed -eq 0 ]]; then
   printf '\033[32mВсе проверки пройдены\033[0m\n'

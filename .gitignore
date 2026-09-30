@@ -8,3 +8,7 @@ kubeconfig*
 # Служебное
 .vscode/
 .idea/
+
+# Кэши инструментов, если $HOME не задан
+ansible/.cache/
+ansible/.kube/

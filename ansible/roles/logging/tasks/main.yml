@@ -1,0 +1,29 @@
+---
+# Loki (хранилище логов) + Fluentd (сборщик) из deploy/logging.
+
+- name: Install Loki
+  kubernetes.core.helm:
+    kubeconfig: "{{ kubeconfig }}"
+    release_name: loki
+    release_namespace: logging
+    create_namespace: true
+    chart_repo_url: https://grafana.github.io/helm-charts
+    chart_ref: loki
+    chart_version: "{{ loki_chart_version }}"
+    values_files:
+      - "{{ repo_root }}/helm-values/loki.yaml"
+    wait: true
+    wait_timeout: 10m
+
+- name: Apply Fluentd
+  ansible.builtin.command: kubectl apply -k {{ repo_root }}/deploy/logging
+  environment:
+    KUBECONFIG: "{{ kubeconfig }}"
+  register: logging_apply
+  changed_when: logging_apply.stdout is search(' (created|configured)')
+
+- name: Wait for Fluentd rollout
+  ansible.builtin.command: kubectl -n logging rollout status daemonset/fluentd --timeout=300s
+  environment:
+    KUBECONFIG: "{{ kubeconfig }}"
+  changed_when: false

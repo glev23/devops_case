@@ -27,6 +27,9 @@ envoy_gateway_version: "v1.9.2"
 # Мониторинг: Prometheus Operator v0.94.1, Prometheus, Alertmanager, Grafana
 kube_prometheus_stack_version: "91.8.2"
 
+# Логирование: Loki 3.6 (чарт grafana/loki), Fluentd — образ в deploy/logging
+loki_chart_version: "7.3.0"
+
 # Helm (ветка 3: модули kubernetes.core рассчитаны на Helm 3)
 helm_version: "v3.22.0"
 

@@ -8,6 +8,9 @@ set -euo pipefail
 
 cd "$(dirname "$0")"
 
+# Helm и kubectl хранят кэш в $HOME; без него (cron, systemd) он попал бы в репозиторий
+export HOME="${HOME:-/root}"
+
 if [[ $EUID -ne 0 ]]; then
   echo "Запустите через sudo: sudo ./deploy.sh" >&2
   exit 1

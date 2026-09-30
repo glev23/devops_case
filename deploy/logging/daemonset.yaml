@@ -1,0 +1,55 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: fluentd
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: fluentd
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: fluentd
+    spec:
+      automountServiceAccountToken: false
+      tolerations:
+        - operator: Exists
+      containers:
+        - name: fluentd
+          # Официальный образ Grafana: Fluentd 1.19 + плагин fluent-plugin-grafana-loki
+          image: grafana/fluent-plugin-loki:3.7.8
+          securityContext:
+            # Файлы логов контейнеров принадлежат root (0640)
+            runAsUser: 0
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          resources:
+            requests:
+              cpu: 20m
+              memory: 96Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          volumeMounts:
+            - name: config
+              mountPath: /fluentd/etc/fluent.conf
+              subPath: fluent.conf
+              readOnly: true
+            - name: varlog
+              mountPath: /var/log
+              readOnly: true
+            # Позиции чтения и буфер — на диске узла, переживают перезапуск пода
+            - name: state
+              mountPath: /var/log/fluentd
+      volumes:
+        - name: config
+          configMap:
+            name: fluentd
+        - name: varlog
+          hostPath:
+            path: /var/log
+        - name: state
+          hostPath:
+            path: /var/log/fluentd
+            type: DirectoryOrCreate
