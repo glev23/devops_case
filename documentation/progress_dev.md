@@ -81,7 +81,9 @@ ROLLOUT-001, TRACE-001, DEMO-001 — см. очередь и «План по д�
 
 **GW-003 закрыта** (01.10.2026) — [gw-003.md](./tasks/gw-003.md): политики Envoy Gateway, rate limit `200×5 429×25`; e2e 6 мин 22 с.
 
-**Дальше:** SEC-001.
+**SEC-001 закрыта** (01.10.2026) — [sec-001.md](./tasks/sec-001.md): basic auth, NetworkPolicy, PDB; применение манифестов через `kubectl diff`; e2e 7 мин 16 с.
+
+**Дальше:** SLO-001.
 
 ## Очередь выполнения
 
@@ -117,8 +119,8 @@ ROLLOUT-001, TRACE-001, DEMO-001 — см. очередь и «План по д�
 | № | Задача | Статус | Зависимости | Законченный результат |
 |---:|---|---|---|---|
 | 110 | [GW-003](./tasks/gw-003.md) | `done` | GW-002 | Политики Envoy Gateway: таймауты, ретраи на сетевые сбои, circuit breaker, rate limit → 429; `/error` — отдельное правило |
-| 120 | [SEC-001](./tasks/sec-001.md) | `ready` | GW-003 | Basic auth на Prometheus (`SecurityPolicy`), NetworkPolicy в `demo`, PDB; сводка мер безопасности |
-| 130 | [SLO-001](./tasks/slo-001.md) | `planned` | GW-003, MON-002 | SLI доступности, SLO 99,9%, бюджет ошибок, burn-rate алерты, дашборд SLO |
+| 120 | [SEC-001](./tasks/sec-001.md) | `done` | GW-003 | Basic auth на Prometheus (`SecurityPolicy`), NetworkPolicy в `demo`, PDB; сводка мер безопасности |
+| 130 | [SLO-001](./tasks/slo-001.md) | `ready` | GW-003, MON-002 | SLI доступности, SLO 99,9%, бюджет ошибок, burn-rate алерты, дашборд SLO |
 | 140 | [CD-001](./tasks/cd-001.md) | `planned` | SEC-001 | Argo CD: кластер синхронизируется с GitHub (pull-модель), UI через Gateway, в CI — по SHA коммита |
 | 150 | [ROLLOUT-001](./tasks/rollout-001.md) | `planned` | CD-001, SLO-001, GW-003 | Argo Rollouts + Gateway API: canary 10→30→60→100%, анализ 5xx в Prometheus, автооткат плохого релиза |
 | 160 | [TRACE-001](./tasks/trace-001.md) | `planned` | GW-002, LOG-001, GRAF-001 | Трейсы Envoy → Tempo, переходы лог ↔ трейс в Grafana |

@@ -185,6 +185,10 @@ latency), CPU/RAM и дашборды. CPU/RAM и дашборды класте�
 | Минимум понятных команд | цель: `make deploy` (или `./deploy.sh`) + `make verify` |
 | Версии зафиксированы | все версии чартов, образов и CRD прописаны явно, `latest` не используется |
 
+Применение наших манифестов — общая роль `kustomize`: `kubectl diff`
+(серверный dry-run) → `kubectl apply` только при различиях; так признак
+изменения в Ansible честный (SEC-001).
+
 Инструменты (D-07): **Makefile** — точка входа; **Ansible** — подготовка
 узла, kubeadm, установка чартов; **Helm** — сторонние компоненты с
 закреплёнными версиями чартов; **Kustomize** — наши ресурсы (приложение,
@@ -223,15 +227,22 @@ documentation/         — эта документация
 
 ## 10. Безопасность и надёжность
 
-Обязательно (критерий 4):
+Сводка реализованных мер (для README и паспорта):
 
-- в репозитории нет паролей, токенов, ключей и персональных данных;
-  секреты — через `.env.example` → переменные окружения → `Secret`;
-- версии образов закреплены.
+| Область | Меры |
+|---|---|
+| Секреты | в репозитории нет паролей, ключей, токенов; пароли Grafana и Prometheus генерируются при установке (24 символа) и живут только в Secret; ключи TLS выпускает cert-manager в кластере; gitleaks по всей истории git в CI |
+| Доступ | Grafana — логин; Prometheus через Gateway — basic auth (`SecurityPolicy`); маршруты к Gateway — только из namespace с меткой `gateway-access` |
+| Сеть | NetworkPolicy в `demo`: default deny ingress, к nginx — только прокси Envoy и `demo`, к экспортеру — только `monitoring`; метрики control plane — на внутреннем адресе узла |
+| Транспорт | HTTPS на Gateway, собственная цепочка CA, клиент проверяет сертификат |
+| Контейнеры | non-root (nginx 101, loadgen 101), read-only rootfs, `drop: [ALL]`, seccomp `RuntimeDefault`, без токена ServiceAccount, requests/limits, liveness/readiness probes |
+| Входящий трафик | таймауты, лимит соединений, rate limit → 429, отклонение заголовков с `_`, `X-Forwarded-For` клиента не доверяется (GW-003) |
+| Доступность | 2 реплики + PodDisruptionBudget `minAvailable: 1`; ретраи на сетевые сбои, circuit breaker |
+| Цепочка поставки | закреплённые версии всех образов, чартов и пакетов (`apt-mark hold`); официальные публичные образы |
 
-По желанию (SEC-001): `resources` requests/limits, liveness/readiness
-probes, `securityContext` (non-root, read-only rootfs), несколько реплик +
-PodDisruptionBudget, NetworkPolicy, отдельные namespaces по компонентам.
+Не сделано (ограничения): Fluentd работает от root (файлы логов узла);
+basic auth Envoy поддерживает только `{SHA}`; mTLS между сервисами нет;
+исходящий трафик подов не ограничен.
 
 ---
 
@@ -269,9 +280,11 @@ VPN без публичного адреса, а self-hosted runner на лич�
   история теряется (нет StorageClass; для продакшена нужен PV).
 - Fluentd работает от root (uid 0) — файлы логов контейнеров принадлежат root;
   capabilities сброшены, повышение привилегий запрещено.
-- Prometheus UI доступен через Gateway без аутентификации (Grafana — с
-  логином). Для браузера нужны записи в hosts: `<IP> grafana.devops.test
-  prometheus.devops.test`.
+- Для браузера нужны записи в hosts: `<IP> grafana.devops.test
+  prometheus.devops.test`; в Firefox с DNS-over-HTTPS — исключение для
+  `devops.test`.
+- Basic auth Envoy поддерживает только хэш `{SHA}` — компенсируется
+  случайным паролем из 24 символов.
 - Настройки kubeadm (включая адреса метрик control plane) применяются только
   при создании кластера; на уже созданном кластере их изменение не
   применяется повторным `deploy.sh`.
