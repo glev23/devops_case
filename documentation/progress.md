@@ -31,7 +31,7 @@ canary с откатом, трейсинг, `make demo`), проверка с н
 | Grafana: 29 дашбордов (кластер, CPU/RAM), метрики и логи Loki в одном окне, доступ через Gateway (`grafana.devops.test`) | ✅ | MON-001, GRAF-001 |
 | HTTP-метрики Envoy по маршрутам (запросы, коды, p50/p95/p99), свой дашборд с логами Loki, алерты, фоновая нагрузка | ✅ | MON-002 |
 | CI/CD: линты, поиск секретов, развёртывание с нуля на Ubuntu 24.04 (kubeadm) на каждый push | ✅ | CI-001 |
-| Политики трафика Gateway: таймауты, ретраи, circuit breaker, rate limit | ⬜ | GW-003 |
+| Политики трафика Gateway: таймауты, ретраи на сетевые сбои, circuit breaker, rate limit → 429, защита заголовков | ✅ | GW-003 |
 | Практики безопасности: basic auth на Prometheus, NetworkPolicy, PDB | ⬜ | SEC-001 |
 | SLO 99,9%, бюджет ошибок, burn-rate алерты | ⬜ | SLO-001 |
 | GitOps-CD: Argo CD синхронизирует кластер с GitHub | ⬜ | CD-001 |

@@ -124,6 +124,13 @@ v1.21.2 через собственную цепочку CA (`selfsigned` → `d
 `devops-test-tls`), проверка клиентом по `ca.crt` без `-k`. Маршруты
 подключены к обоим listener. Подробности — tasks/gw-002.md.
 
+Политики трафика (GW-003): `BackendTrafficPolicy demo/hello` — таймауты
+(запрос 5 с, подключение 2 с), ретраи только на сетевые сбои, circuit
+breaker, local rate limit 5 запросов/с на `/limited` → 429;
+`ClientTrafficPolicy gateway/main` — таймауты клиента, лимит соединений,
+отклонение заголовков с `_`, сохранение `X-Request-Id`. `/error` вынесен в
+отдельное правило (`#3`), чтобы намеренные 500 не портили SLI.
+
 Исходный план GW-002: маршруты по path, два backend `v1`/`v2`
 с весами 80/20, маршрут, отвечающий 500 (для графика кодов), TLS-listener с
 сертификатом от cert-manager (self-signed `ClusterIssuer`, ключи не попадают

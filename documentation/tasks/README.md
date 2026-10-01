@@ -125,8 +125,8 @@
 | [GRAF-001](./graf-001.md) | `done` |
 | [GW-002](./gw-002.md) | `done` |
 | [MON-002](./mon-002.md) | `done` |
-| [GW-003](./gw-003.md) | `ready` |
-| [SEC-001](./sec-001.md) | `planned` |
+| [GW-003](./gw-003.md) | `done` |
+| [SEC-001](./sec-001.md) | `ready` |
 | [SLO-001](./slo-001.md) | `planned` |
 | [CD-001](./cd-001.md) | `planned` |
 | [ROLLOUT-001](./rollout-001.md) | `planned` |
