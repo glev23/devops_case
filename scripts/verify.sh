@@ -188,12 +188,16 @@ fi
 
 section "Мониторинг (Prometheus)"
 PROM_URL="http://kps-prometheus.monitoring:9090/api/v1/query"
-# Все PromQL-запросы одним подом; каждый ответ — одна JSON-строка
-prom_out=$(in_cluster "
-  for q in 'count(up == 0) or vector(0)' 'count(up)' 'sum by (job) (up)' 'sum(nginx_http_requests_total)'; do
-    curl -s -m 10 -G '$PROM_URL' --data-urlencode \"query=\$q\"; echo
-  done")
-prom_parsed=$(python3 - "$prom_out" <<'PY'
+# Все PromQL-запросы одним подом; каждый ответ — одна JSON-строка.
+# ServiceMonitor приложения создаётся последним: Prometheus подхватывает его
+# после перезагрузки конфигурации (обычно 30–90 с) — поэтому с повторами.
+get() { awk -v k="$1" '$1 == k { $1 = ""; sub(/^ /, ""); print }' <<< "$prom_parsed"; }
+for _ in 1 2 3 4 5 6 7 8; do
+  prom_out=$(in_cluster "
+    for q in 'count(up == 0) or vector(0)' 'count(up)' 'sum by (job) (up)' 'sum(nginx_http_requests_total)'; do
+      curl -s -m 10 -G '$PROM_URL' --data-urlencode \"query=\$q\"; echo
+    done")
+  prom_parsed=$(python3 - "$prom_out" <<'PY'
 import json, sys
 lines = [l for l in sys.argv[1].splitlines() if l.startswith('{')]
 def vals(i):
@@ -207,8 +211,10 @@ print('total', total[0]['value'][1] if total else 'ERR')
 print('jobs', ' '.join(sorted(r['metric'].get('job', '?') for r in (jobs or []) if float(r['value'][1]) > 0)))
 print('reqs', reqs[0]['value'][1] if reqs else 'ERR')
 PY
-)
-get() { awk -v k="$1" '$1 == k { $1 = ""; sub(/^ /, ""); print }' <<< "$prom_parsed"; }
+  )
+  [[ " $(get jobs) " == *" hello "* && $(get reqs) != ERR ]] && break
+  sleep 15
+done
 
 if [[ $(get total) =~ ^[0-9]+$ ]]; then
   ok "Prometheus отвечает, targets: $(get total)"
