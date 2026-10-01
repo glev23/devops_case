@@ -70,7 +70,9 @@ Ubuntu 24.04 и частично заменяет ручной QA.
 
 **LOG-001 закрыта** (01.10.2026) — [log-001.md](./tasks/log-001.md). Все обязательные технические части (пп. 1–5 кейса) работают и проверяются в CI.
 
-**Дальше:** GRAF-001 (Loki в Grafana, доступ через Gateway), GW-002, MON-002, SEC-001; затем AUTO-001/QA-001 и материалы сдачи.
+**GRAF-001 закрыта** (01.10.2026) — [graf-001.md](./tasks/graf-001.md): Grafana и Prometheus через Gateway по hostname, datasource Loki; e2e 5 мин 57 с.
+
+**Дальше:** GW-002 (path, веса, TLS), MON-002, SEC-001; затем AUTO-001/QA-001 и материалы сдачи.
 
 ## Очередь выполнения
 
@@ -96,8 +98,8 @@ Ubuntu 24.04 и частично заменяет ручной QA.
 
 | № | Задача | Статус | Зависимости | Законченный результат |
 |---:|---|---|---|---|
-| 90 | GW-002 | `ready` | GW-001 | Маршруты по host и path, несколько backend, traffic splitting по весам, TLS — у каждого есть `curl`-проверка |
-| 95 | GRAF-001 | `ready` | MON-001, LOG-001, GW-001 | Grafana из kube-prometheus-stack: datasources Prometheus + Loki, готовые дашборды кластера (CPU/RAM), доступ через Gateway (`HTTPRoute`), пароль admin — из сгенерированного Secret, не из репозитория |
+| 90 | GW-002 | `ready` | GW-001 | Маршруты по path, несколько backend, traffic splitting по весам, TLS — у каждого есть `curl`-проверка (по hostname — сделано в GRAF-001) |
+| 95 | [GRAF-001](./tasks/graf-001.md) | `done` | MON-001, LOG-001, GW-001 | Grafana из kube-prometheus-stack: datasources Prometheus + Loki, готовые дашборды кластера (CPU/RAM), доступ через Gateway (`HTTPRoute`), пароль admin — из сгенерированного Secret, не из репозитория |
 | 100 | MON-002 | `ready` | MON-001, GW-001, GRAF-001 | HTTP-метрики Envoy (запросы, коды, latency) + свой дашборд JSON в репозитории |
 | 110 | SEC-001 | `planned` | APP-001 | requests/limits, probes, securityContext, реплики + PDB, NetworkPolicy |
 | 120 | [CI-001](./tasks/ci-001.md) | `done` | CLUSTER-001, APP-001 | lint + gitleaks + e2e: `deploy.sh` с нуля на раннере ubuntu-24.04 (kubeadm), повтор с `changed=0`, `verify.sh` |

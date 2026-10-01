@@ -109,8 +109,12 @@ DNS-прокси Default Switch: тот отвечал через раз. IP VM 
 | Как трафик попадает на Gateway | Service прокси Envoy типа **NodePort** с фиксированными портами `30080` (HTTP) и `30443` (HTTPS, GW-002) через ресурс `EnvoyProxy` |
 | Проверка | `curl http://<IP узла>:30080/` → `Hello World! from <pod>` (точная команда — в GW-001) |
 
-Расширенные возможности (GW-002): маршруты по path и по hostname
-(проверка через `curl -H "Host: …"`, без внешнего DNS), два backend `v1`/`v2`
+Маршрутизация по hostname (GRAF-001): `grafana.devops.test` → Grafana,
+`prometheus.devops.test` → Prometheus UI, любой другой Host → приложение
+(маршрут без `hostnames`). Проверка — `curl -H "Host: …"`, без внешнего DNS;
+домен `.test` зарезервирован RFC 2606.
+
+Расширенные возможности (GW-002): маршруты по path, два backend `v1`/`v2`
 с весами 80/20, маршрут, отвечающий 500 (для графика кодов), TLS-listener с
 сертификатом от cert-manager (self-signed `ClusterIssuer`, ключи не попадают
 в репозиторий). MetalLB вместо NodePort — только если останется время.
@@ -244,6 +248,9 @@ VPN без публичного адреса, а self-hosted runner на лич�
   история теряется (нет StorageClass; для продакшена нужен PV).
 - Fluentd работает от root (uid 0) — файлы логов контейнеров принадлежат root;
   capabilities сброшены, повышение привилегий запрещено.
+- Prometheus UI доступен через Gateway без аутентификации (Grafana — с
+  логином). Для браузера нужны записи в hosts: `<IP> grafana.devops.test
+  prometheus.devops.test`.
 - Настройки kubeadm (включая адреса метрик control plane) применяются только
   при создании кластера; на уже созданном кластере их изменение не
   применяется повторным `deploy.sh`.
