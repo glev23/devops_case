@@ -8,4 +8,16 @@ labels:
     includeSelectors: false
 
 resources:
-  - httproutes.yaml
+  - httproutes.yaml       # Grafana и Prometheus через Gateway по hostname
+  - envoy-monitors.yaml   # метрики Envoy Gateway (прокси и контроллер)
+  - alerts.yaml           # алерты и recording rules
+
+# Дашборд Grafana: sidecar подхватывает ConfigMap с меткой grafana_dashboard=1
+configMapGenerator:
+  - name: dashboard-gateway-app
+    files:
+      - dashboards/gateway-app.json
+    options:
+      disableNameSuffixHash: true
+      labels:
+        grafana_dashboard: "1"

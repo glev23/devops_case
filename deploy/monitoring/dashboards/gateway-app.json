@@ -1,0 +1,132 @@
+{
+  "uid": "devops-case-gateway",
+  "title": "DevOps case / Gateway и приложение",
+  "description": "HTTP-метрики Envoy Gateway по маршрутам, коды ответов, latency, деление трафика v1/v2, ресурсы приложения и логи ошибок из Loki.",
+  "tags": ["devops-case", "gateway-api", "envoy", "nginx"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": true,
+  "refresh": "30s",
+  "time": { "from": "now-1h", "to": "now" },
+  "templating": { "list": [] },
+  "annotations": { "list": [] },
+  "panels": [
+    {
+      "type": "stat", "title": "Запросов/с через Gateway", "id": 1,
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "reqps", "decimals": 1 }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "value", "graphMode": "area" },
+      "targets": [ { "refId": "A", "expr": "sum(rate(envoy_http_downstream_rq_total{envoy_http_conn_manager_prefix=~\"https?-.*\"}[1m]))" } ]
+    },
+    {
+      "type": "stat", "title": "Доля 5xx (5 мин)", "id": 2,
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit", "decimals": 2,
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "orange", "value": 0.05 }, { "color": "red", "value": 0.1 } ] }
+        }, "overrides": []
+      },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background" },
+      "targets": [ { "refId": "A", "expr": "sum(route:envoy_upstream_rq_5xx:rate5m) / sum(route:envoy_upstream_rq:rate5m)" } ]
+    },
+    {
+      "type": "stat", "title": "p95 времени ответа Gateway", "id": 3,
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms", "decimals": 1,
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "orange", "value": 200 }, { "color": "red", "value": 500 } ] }
+        }, "overrides": []
+      },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "value" },
+      "targets": [ { "refId": "A", "expr": "histogram_quantile(0.95, sum by (le) (rate(envoy_http_downstream_rq_time_bucket{envoy_http_conn_manager_prefix=~\"https?-.*\"}[5m])))" } ]
+    },
+    {
+      "type": "stat", "title": "Поды приложения UP", "id": 4,
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "red", "value": null }, { "color": "green", "value": 3 } ] }
+        }, "overrides": []
+      },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background" },
+      "targets": [ { "refId": "A", "expr": "sum(up{job=~\"hello|hello-v2\"})" } ]
+    },
+    {
+      "type": "timeseries", "title": "Запросы/с по маршрутам HTTPRoute", "id": 5,
+      "description": "demo/hello#0 — /canary (80/20), #1 — /v2, #2 — /; monitoring/* — Grafana и Prometheus по hostname.",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "reqps", "custom": { "fillOpacity": 10 } }, "overrides": [] },
+      "targets": [ { "refId": "A", "expr": "route:envoy_upstream_rq:rate5m", "legendFormat": "{{route}}" } ]
+    },
+    {
+      "type": "timeseries", "title": "Ответы по классам кодов", "id": 6,
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": { "unit": "reqps", "custom": { "fillOpacity": 20, "stacking": { "mode": "normal" } } },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "2xx" }, "properties": [ { "id": "color", "value": { "mode": "fixed", "fixedColor": "green" } } ] },
+          { "matcher": { "id": "byName", "options": "4xx" }, "properties": [ { "id": "color", "value": { "mode": "fixed", "fixedColor": "orange" } } ] },
+          { "matcher": { "id": "byName", "options": "5xx" }, "properties": [ { "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } } ] }
+        ]
+      },
+      "targets": [ { "refId": "A", "expr": "sum by (envoy_response_code_class) (rate(envoy_cluster_upstream_rq_xx{envoy_cluster_name=~\"httproute/.*\"}[1m]))", "legendFormat": "{{envoy_response_code_class}}xx" } ]
+    },
+    {
+      "type": "timeseries", "title": "Время ответа upstream: p50 / p95 / p99", "id": 7,
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "ms" }, "overrides": [] },
+      "targets": [
+        { "refId": "A", "expr": "histogram_quantile(0.50, sum by (le) (rate(envoy_cluster_upstream_rq_time_bucket{envoy_cluster_name=~\"httproute/demo/.*\"}[5m])))", "legendFormat": "p50" },
+        { "refId": "B", "expr": "histogram_quantile(0.95, sum by (le) (rate(envoy_cluster_upstream_rq_time_bucket{envoy_cluster_name=~\"httproute/demo/.*\"}[5m])))", "legendFormat": "p95" },
+        { "refId": "C", "expr": "histogram_quantile(0.99, sum by (le) (rate(envoy_cluster_upstream_rq_time_bucket{envoy_cluster_name=~\"httproute/demo/.*\"}[5m])))", "legendFormat": "p99" }
+      ]
+    },
+    {
+      "type": "timeseries", "title": "Деление трафика: hello (v1) / hello-v2", "id": 8,
+      "description": "Запросы, принятые nginx каждой версии (метрики nginx-exporter).",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "reqps", "custom": { "fillOpacity": 30, "stacking": { "mode": "percent" } } }, "overrides": [] },
+      "targets": [ { "refId": "A", "expr": "sum by (job) (rate(nginx_http_requests_total{namespace=\"demo\"}[1m]))", "legendFormat": "{{job}}" } ]
+    },
+    {
+      "type": "timeseries", "title": "Запросы/с: HTTP и HTTPS listener", "id": 9,
+      "gridPos": { "h": 7, "w": 8, "x": 0, "y": 20 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] },
+      "targets": [ { "refId": "A", "expr": "sum by (envoy_http_conn_manager_prefix) (rate(envoy_http_downstream_rq_total{envoy_http_conn_manager_prefix=~\"https?-.*\"}[1m]))", "legendFormat": "{{envoy_http_conn_manager_prefix}}" } ]
+    },
+    {
+      "type": "timeseries", "title": "CPU подов приложения", "id": 10,
+      "gridPos": { "h": 7, "w": 8, "x": 8, "y": 20 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "cores" }, "overrides": [] },
+      "targets": [ { "refId": "A", "expr": "sum by (pod) (rate(container_cpu_usage_seconds_total{namespace=\"demo\",container!=\"\"}[2m]))", "legendFormat": "{{pod}}" } ]
+    },
+    {
+      "type": "timeseries", "title": "Память подов приложения", "id": 11,
+      "gridPos": { "h": 7, "w": 8, "x": 16, "y": 20 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "bytes" }, "overrides": [] },
+      "targets": [ { "refId": "A", "expr": "sum by (pod) (container_memory_working_set_bytes{namespace=\"demo\",container!=\"\"})", "legendFormat": "{{pod}}" } ]
+    },
+    {
+      "type": "logs", "title": "Логи nginx: ответы 4xx/5xx (Loki)", "id": 12,
+      "gridPos": { "h": 9, "w": 24, "x": 0, "y": 27 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "options": { "showTime": true, "wrapLogMessage": true, "sortOrder": "Descending", "enableLogDetails": true },
+      "targets": [ { "refId": "A", "expr": "{namespace=\"demo\", container=\"nginx\"} | json | status >= 400" } ]
+    }
+  ]
+}

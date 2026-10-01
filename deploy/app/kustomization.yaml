@@ -12,3 +12,4 @@ resources:
   - base        # hello (v1): 2 реплики
   - v2          # hello-v2: 1 реплика
   - httproute.yaml
+  - loadgen.yaml   # фоновая нагрузка для графиков

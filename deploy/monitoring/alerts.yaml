@@ -1,0 +1,79 @@
+# Правила алертов решения (Prometheus подхватывает PrometheusRule из любых
+# namespace: ruleSelectorNilUsesHelmValues=false). Видны в Prometheus → Alerts
+# и в Alertmanager.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: devops-case
+spec:
+  groups:
+    - name: devops-case.app
+      rules:
+        - alert: DemoAppTargetDown
+          expr: up{job=~"hello|hello-v2"} == 0
+          for: 1m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Под приложения {{ $labels.pod }} не отдаёт метрики"
+            description: "Prometheus не может опросить {{ $labels.job }}/{{ $labels.pod }} больше минуты."
+        - alert: DemoAppNoReplicas
+          expr: kube_deployment_status_replicas_available{namespace="demo",deployment=~"hello|hello-v2"} < 1
+          for: 1m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Нет доступных реплик {{ $labels.deployment }}"
+            description: "Deployment demo/{{ $labels.deployment }} без доступных подов больше минуты."
+    - name: devops-case.gateway
+      rules:
+        - record: route:envoy_upstream_rq:rate5m
+          expr: sum by (route) (rate(envoy_cluster_upstream_rq_total{envoy_cluster_name=~"httproute/.*"}[5m]))
+        - record: route:envoy_upstream_rq_5xx:rate5m
+          expr: sum by (route) (rate(envoy_cluster_upstream_rq_xx{envoy_cluster_name=~"httproute/.*",envoy_response_code_class="5"}[5m]))
+        - alert: GatewayHigh5xxRatio
+          expr: |
+            sum(route:envoy_upstream_rq_5xx:rate5m) / sum(route:envoy_upstream_rq:rate5m) > 0.10
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Доля ответов 5xx через Gateway выше 10%"
+            description: "За 5 минут {{ $value | humanizePercentage }} запросов через Gateway завершились 5xx."
+        - alert: GatewayHighLatencyP95
+          expr: |
+            histogram_quantile(0.95, sum by (le) (rate(envoy_http_downstream_rq_time_bucket{envoy_http_conn_manager_prefix=~"https?-.*"}[5m]))) > 500
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "p95 времени ответа Gateway выше 500 мс"
+            description: "p95 = {{ $value }} мс за 5 минут."
+        - alert: GatewayProxyDown
+          expr: absent(up{job="monitoring/envoy-proxy"} == 1)
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Прокси Envoy Gateway недоступен для Prometheus"
+            description: "Нет ни одного прокси Envoy в состоянии up больше 2 минут."
+    - name: devops-case.logging
+      rules:
+        - alert: FluentdNotReady
+          expr: |
+            kube_daemonset_status_number_ready{namespace="logging",daemonset="fluentd"}
+              < kube_daemonset_status_desired_number_scheduled{namespace="logging",daemonset="fluentd"}
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Fluentd запущен не на всех узлах"
+            description: "Готово {{ $value }} подов Fluentd меньше, чем требуется: логи части узлов не собираются."
+        - alert: LokiDown
+          expr: absent(up{job=~".*loki.*"} == 1)
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Loki недоступен"
+            description: "Prometheus не видит Loki больше 2 минут: логи не принимаются."

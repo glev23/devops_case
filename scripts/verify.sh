@@ -272,6 +272,52 @@ for ds in prometheus loki; do
   fi
 done
 
+section "HTTP-метрики Envoy, алерты, дашборд"
+# PodMonitor подхватывается не мгновенно (перезагрузка конфигурации Prometheus) — с повторами
+envoy_rq=""
+for _ in 1 2 3 4 5 6 7 8; do
+  envoy_out=$(in_cluster "curl -s -m 10 -G '$PROM_URL' --data-urlencode 'query=sum by (route) (envoy_cluster_upstream_rq_total{envoy_cluster_name=~\"httproute/demo/.*\"})'")
+  envoy_rq=$(python3 -c '
+import json, sys
+try:
+    res = json.loads(sys.argv[1])["data"]["result"]
+    print(" ".join("%s=%s" % (r["metric"].get("route", "?"), r["value"][1]) for r in sorted(res, key=lambda r: r["metric"].get("route", ""))))
+except Exception:
+    print("")
+' "$(grep -m1 '^{' <<< "$envoy_out" || true)")
+  [[ -n $envoy_rq ]] && break
+  sleep 10
+done
+if [[ -n $envoy_rq ]]; then
+  ok "метрики Envoy по маршрутам в Prometheus: $envoy_rq"
+else
+  fail "метрики Envoy (envoy_cluster_upstream_rq_total) не найдены в Prometheus"
+fi
+
+rules_out=$(in_cluster "curl -s -m 10 http://kps-prometheus.monitoring:9090/api/v1/rules")
+# Ответ со всеми правилами большой — передаётся через stdin, а не аргументом
+rule_groups=$(grep -m1 '^{' <<< "$rules_out" | python3 -c '
+import json, sys
+try:
+    groups = json.load(sys.stdin)["data"]["groups"]
+    print(" ".join(sorted(g["name"] for g in groups if g["name"].startswith("devops-case"))))
+except Exception:
+    print("")
+' || true)
+if [[ $rule_groups == *devops-case.app*devops-case.gateway*devops-case.logging* ]]; then
+  ok "правила алертов загружены: $rule_groups"
+else
+  fail "правила алертов devops-case не загружены (${rule_groups:-нет})"
+fi
+
+dash_title=$(gw_host grafana.devops.test /api/dashboards/uid/devops-case-gateway -u "admin:$graf_pw" \
+  | python3 -c 'import json,sys; print(json.load(sys.stdin)["dashboard"]["title"])' 2>/dev/null || true)
+if [[ -n $dash_title ]]; then
+  ok "дашборд Grafana: «$dash_title» (http://grafana.devops.test:30080/d/devops-case-gateway)"
+else
+  fail "дашборд devops-case-gateway не найден в Grafana"
+fi
+
 echo
 if [[ $failed -eq 0 ]]; then
   printf '\033[32mВсе проверки пройдены\033[0m\n'

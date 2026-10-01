@@ -1,0 +1,63 @@
+# Генератор фоновой нагрузки: ходит в приложение через Gateway (NodePort на
+# адресе узла), чтобы графики и логи были живыми сразу после установки.
+# ~4 запроса/с по маршрутам /, /canary, /v2 (HTTP), каждый 2-й цикл — HTTPS,
+# каждый 20-й — /error (500), каждый 25-й — несуществующий путь (404).
+# Остановить: kubectl -n demo scale deploy/loadgen --replicas=0
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: loadgen
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: loadgen
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: loadgen
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 101
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: loadgen
+          image: curlimages/curl:8.16.0
+          env:
+            - name: NODE_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP
+          command:
+            - sh
+            - -c
+            - |
+              base="http://$NODE_IP:30080"
+              i=0
+              while true; do
+                i=$((i + 1))
+                for path in / /canary /canary /v2; do
+                  curl -s -o /dev/null -m 5 -H "X-Request-Id: loadgen-$i" "$base$path?src=loadgen" || true
+                done
+                # HTTPS-listener; -k только здесь: сертификат проверяется в verify.sh по CA
+                [ $((i % 2)) -eq 0 ] && curl -sk -o /dev/null -m 5 \
+                  --resolve "hello.devops.test:30443:$NODE_IP" "https://hello.devops.test:30443/?src=loadgen"
+                [ $((i % 20)) -eq 0 ] && curl -s -o /dev/null -m 5 "$base/error?src=loadgen"
+                [ $((i % 25)) -eq 0 ] && curl -s -o /dev/null -m 5 "$base/no-such-page?src=loadgen"
+                sleep 1
+              done
+          resources:
+            requests:
+              cpu: 5m
+              memory: 8Mi
+            limits:
+              cpu: 100m
+              memory: 32Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]

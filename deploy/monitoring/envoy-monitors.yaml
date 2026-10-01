@@ -1,0 +1,45 @@
+# Метрики Gateway API в Prometheus.
+# Прокси Envoy отдаёт /stats/prometheus на порту metrics (19001); каждое правило
+# HTTPRoute — отдельный upstream-кластер "httproute/<ns>/<route>/rule/<N>".
+# Для читаемых графиков добавляется метка route="<ns>/<route>#<N>".
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: envoy-proxy
+spec:
+  namespaceSelector:
+    matchNames:
+      - envoy-gateway-system
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: proxy
+      app.kubernetes.io/managed-by: envoy-gateway
+  podMetricsEndpoints:
+    - port: metrics
+      path: /stats/prometheus
+      interval: 15s
+      metricRelabelings:
+        # action указан явно (значение по умолчанию), иначе apply сообщает configured
+        - action: replace
+          sourceLabels: [envoy_cluster_name]
+          regex: httproute/([^/]+)/([^/]+)/rule/([0-9]+)
+          targetLabel: route
+          replacement: "$1/$2#$3"
+---
+# Контроллер Envoy Gateway (xDS, статус ресурсов Gateway API)
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: envoy-gateway
+spec:
+  namespaceSelector:
+    matchNames:
+      - envoy-gateway-system
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: eg
+      app.kubernetes.io/name: gateway-helm
+      control-plane: envoy-gateway
+  endpoints:
+    - port: metrics
+      interval: 30s

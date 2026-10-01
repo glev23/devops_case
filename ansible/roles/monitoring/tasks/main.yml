@@ -54,7 +54,7 @@
     wait: true
     wait_timeout: 15m
 
-- name: Apply Grafana and Prometheus routes
+- name: Apply routes, Envoy monitors, alerts and dashboard
   ansible.builtin.command: kubectl apply -k {{ repo_root }}/deploy/monitoring
   environment:
     KUBECONFIG: "{{ kubeconfig }}"
