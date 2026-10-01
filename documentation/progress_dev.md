@@ -74,7 +74,9 @@ Ubuntu 24.04 и частично заменяет ручной QA.
 
 **GW-002 закрыта** (01.10.2026) — [gw-002.md](./tasks/gw-002.md): `/v2`, `/canary` 80/20, заголовки, `/error`, HTTPS через cert-manager; e2e 6 мин 47 с.
 
-**Дальше:** MON-002 (дашборд Envoy, нагрузка), SEC-001; затем AUTO-001/QA-001 и материалы сдачи.
+**MON-002 закрыта** (01.10.2026) — [mon-002.md](./tasks/mon-002.md): метрики Envoy, 7 алертов, дашборд, loadgen; e2e 6 мин 16 с, 28 проверок.
+
+**Дальше:** SEC-001; затем AUTO-001/QA-001 и материалы сдачи (DOCS-002, PASSPORT-001, SUBMIT-001).
 
 ## Очередь выполнения
 
@@ -102,7 +104,7 @@ Ubuntu 24.04 и частично заменяет ручной QA.
 |---:|---|---|---|---|
 | 90 | [GW-002](./tasks/gw-002.md) | `done` | GW-001 | Маршруты по path, несколько backend, traffic splitting по весам, TLS — у каждого есть `curl`-проверка (по hostname — сделано в GRAF-001) |
 | 95 | [GRAF-001](./tasks/graf-001.md) | `done` | MON-001, LOG-001, GW-001 | Grafana из kube-prometheus-stack: datasources Prometheus + Loki, готовые дашборды кластера (CPU/RAM), доступ через Gateway (`HTTPRoute`), пароль admin — из сгенерированного Secret, не из репозитория |
-| 100 | MON-002 | `ready` | MON-001, GW-001, GRAF-001 | HTTP-метрики Envoy (запросы, коды, latency) + свой дашборд JSON в репозитории |
+| 100 | [MON-002](./tasks/mon-002.md) | `done` | MON-001, GW-001, GRAF-001 | HTTP-метрики Envoy (запросы, коды, latency) + свой дашборд JSON в репозитории |
 | 110 | SEC-001 | `planned` | APP-001 | requests/limits, probes, securityContext, реплики + PDB, NetworkPolicy |
 | 120 | [CI-001](./tasks/ci-001.md) | `done` | CLUSTER-001, APP-001 | lint + gitleaks + e2e: `deploy.sh` с нуля на раннере ubuntu-24.04 (kubeadm), повтор с `changed=0`, `verify.sh` |
 

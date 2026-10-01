@@ -63,7 +63,9 @@ WireGuard в режиме full-tunnel. Чтобы не включался kill-s
 DNS-прокси Default Switch: тот отвечал через раз. IP VM (Default Switch)
 меняется после перезапуска, актуальный адрес показывает `multipass info k8s`.
 Снимки: `clean-ubuntu-v2` (чистая Ubuntu 24.04.5 + эти сетевые настройки) и
-`cluster-ready-v2` (после CLUSTER-001).
+снимок с полным стеком. NTP (UDP 123) через Hyper-V NAT и WireGuard не
+проходит, время VM не синхронизируется — горит алерт
+`NodeClockNotSynchronising`; на обычной Ubuntu и в CI этого нет.
 
 ---
 
@@ -136,6 +138,10 @@ v1.21.2 через собственную цепочку CA (`selfsigned` → `d
 | Способ развёртывания Prometheus | Helm-чарт **kube-prometheus-stack 91.8.2** (D-05; Prometheus Operator v0.94.1): Prometheus, Alertmanager, node-exporter, kube-state-metrics, Grafana 13.2.3. Values — `helm-values/kube-prometheus-stack.yaml` |
 | Обязательный минимум | хотя бы один target в состоянии `UP` + PromQL-запрос, который возвращает данные |
 | Targets | 14 jobs, все `UP`: apiserver, kubelet/cAdvisor, node-exporter, kube-state-metrics, coredns, kube-controller-manager, kube-scheduler, kube-etcd, kube-proxy, компоненты стека, **hello** (nginx-exporter 1.5.3, ServiceMonitor). Метрики control plane kubeadm привязаны к адресу узла `10.200.0.10` (по умолчанию — `127.0.0.1`, и targets были бы DOWN). Envoy — MON-002 |
+| HTTP-метрики Gateway (MON-002) | PodMonitor прокси Envoy (`/stats/prometheus`), метка `route` из правила HTTPRoute; ServiceMonitor контроллера Envoy Gateway |
+| Алерты (MON-002) | `PrometheusRule devops-case`: приложение (targets, реплики), Gateway (5xx > 10%, p95 > 500 мс, прокси), Fluentd, Loki; recording rules по маршрутам |
+| Дашборд (MON-002) | «DevOps case / Gateway и приложение» — JSON в `deploy/monitoring/dashboards/`, ConfigMap с `grafana_dashboard: "1"` |
+| Фоновая нагрузка | `demo/loadgen`: ~4 запроса/с через Gateway, графики живые сразу после установки |
 | Хранение | emptyDir, retention 3 дня / 4 ГБ: в кластере нет StorageClass |
 | Grafana | пароль admin случайный, создаётся один раз в Secret `monitoring/grafana-admin`; пароль чарта по умолчанию не работает |
 | Проверка | `/targets` в Prometheus + конкретные PromQL-запросы с ожидаемым результатом (MON-001) |

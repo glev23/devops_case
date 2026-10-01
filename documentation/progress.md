@@ -29,7 +29,7 @@ Ubuntu 24.04. Grafana открывается через Gateway, в ней ме�
 | Расширенный Gateway API: маршрутизация по hostname (Grafana, Prometheus, приложение по умолчанию) | ✅ | GRAF-001 |
 | Расширенный Gateway API: path + URL rewrite, 2 backend, traffic splitting 80/20, заголовки, TLS (cert-manager, свой CA) | ✅ | GW-002 |
 | Grafana: 29 дашбордов (кластер, CPU/RAM), метрики и логи Loki в одном окне, доступ через Gateway (`grafana.devops.test`) | ✅ | MON-001, GRAF-001 |
-| HTTP-метрики (запросы, коды, latency) + свой дашборд | ⬜ | MON-002 |
+| HTTP-метрики Envoy по маршрутам (запросы, коды, p50/p95/p99), свой дашборд с логами Loki, алерты, фоновая нагрузка | ✅ | MON-002 |
 | CI/CD: линты, поиск секретов, развёртывание с нуля на Ubuntu 24.04 (kubeadm) на каждый push | ✅ | CI-001 |
 | Практики надёжности и безопасности | ⬜ | SEC-001 |
 
