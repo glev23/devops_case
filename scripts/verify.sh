@@ -363,7 +363,7 @@ try:
 except Exception:
     print("")
 ' || true)
-if [[ $rule_groups == *devops-case.app*devops-case.gateway*devops-case.logging* ]]; then
+if [[ $rule_groups == *devops-case.app*devops-case.gateway*devops-case.logging*devops-case.slo* ]]; then
   ok "правила алертов загружены: $rule_groups"
 else
   fail "правила алертов devops-case не загружены (${rule_groups:-нет})"
@@ -375,6 +375,42 @@ if [[ -n $dash_title ]]; then
   ok "дашборд Grafana: «$dash_title» (http://grafana.devops.test:30080/d/devops-case-gateway)"
 else
   fail "дашборд devops-case-gateway не найден в Grafana"
+fi
+
+section "SLO доступности (99,9%)"
+# Recording rules считаются раз в 30 с — после свежей установки нужны повторы
+slo_vals=""
+for _ in 1 2 3 4 5 6 7 8; do
+  slo_out=$(in_cluster "
+    for q in 'slo:sli:availability_3d' 'slo:error_budget_remaining:ratio' 'slo:burn_rate:1h' 'slo:sli_error:ratio_rate5m'; do
+      curl -s -m 10 -G '$PROM_URL' --data-urlencode \"query=\$q\"; echo
+    done")
+  slo_vals=$(grep '^{' <<< "$slo_out" | python3 -c '
+import json, sys
+vals = []
+for line in sys.stdin:
+    try:
+        r = json.loads(line)["data"]["result"]
+        vals.append(r[0]["value"][1] if r else "")
+    except Exception:
+        vals.append("")
+print(" ".join(v if v else "-" for v in vals) if all(vals) and len(vals) == 4 else "")
+' || true)
+  [[ -n $slo_vals ]] && break
+  sleep 15
+done
+if [[ -n $slo_vals ]]; then
+  read -r slo_avail slo_budget slo_burn slo_err5m <<< "$slo_vals"
+  ok "SLI доступности (3 дня) = $slo_avail при цели 0.999; остаток бюджета ошибок = $slo_budget"
+  ok "burn rate (1 ч) = $slo_burn; доля ошибок (5 мин) = $slo_err5m"
+else
+  fail "recording rules SLO не вернули значения (slo:sli:availability_3d и др.)"
+fi
+slo_dash=$(gw_host grafana.devops.test /api/dashboards/uid/devops-case-slo -u "admin:$graf_pw"   | python3 -c 'import json,sys; print(json.load(sys.stdin)["dashboard"]["title"])' 2>/dev/null || true)
+if [[ -n $slo_dash ]]; then
+  ok "дашборд Grafana: «$slo_dash» (http://grafana.devops.test:30080/d/devops-case-slo)"
+else
+  fail "дашборд devops-case-slo не найден в Grafana"
 fi
 
 echo

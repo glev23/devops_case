@@ -1,0 +1,120 @@
+{
+  "uid": "devops-case-slo",
+  "title": "DevOps case / SLO доступности",
+  "description": "SLO 99,9% доступности приложения через Gateway: SLI, бюджет ошибок, burn rate (Google SRE workbook, multiwindow multi-burn-rate).",
+  "tags": ["devops-case", "slo", "sre"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": true,
+  "refresh": "30s",
+  "time": { "from": "now-6h", "to": "now" },
+  "templating": { "list": [] },
+  "annotations": { "list": [] },
+  "panels": [
+    {
+      "type": "text", "title": "Как читать", "id": 1,
+      "gridPos": { "h": 5, "w": 24, "x": 0, "y": 0 },
+      "options": {
+        "mode": "markdown",
+        "content": "**SLI** — доля ответов не 5xx по маршрутам приложения `/`, `/v2`, `/canary` (метрики Envoy Gateway; `/error` исключён — отдаёт 500 намеренно). **SLO** — 99,9%, **бюджет ошибок** — 0,1% запросов. Окно бюджета — 3 дня (столько хранит Prometheus). **Burn rate** — во сколько раз быстрее нормы тратится бюджет: 1 = ровно израсходуется к концу окна. Алерты: **14,4×** за 1 ч и 5 мин — critical (быстрое сгорание), **6×** за 6 ч и 30 мин — warning (медленное). Правила — `deploy/monitoring/slo.yaml`."
+      }
+    },
+    {
+      "type": "stat", "title": "Доступность (SLI), 3 дня", "id": 2,
+      "gridPos": { "h": 5, "w": 6, "x": 0, "y": 5 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit", "decimals": 3,
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "red", "value": null }, { "color": "green", "value": 0.999 } ] }
+        }, "overrides": []
+      },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background" },
+      "targets": [ { "refId": "A", "expr": "slo:sli:availability_3d{slo=\"hello-availability\"}" } ]
+    },
+    {
+      "type": "stat", "title": "Цель (SLO)", "id": 3,
+      "gridPos": { "h": 5, "w": 6, "x": 6, "y": 5 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "percentunit", "decimals": 1, "color": { "mode": "fixed", "fixedColor": "blue" } }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "value" },
+      "targets": [ { "refId": "A", "expr": "slo:objective:ratio{slo=\"hello-availability\"}" } ]
+    },
+    {
+      "type": "gauge", "title": "Остаток бюджета ошибок, 3 дня", "id": 4,
+      "gridPos": { "h": 5, "w": 6, "x": 12, "y": 5 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit", "decimals": 1, "min": 0, "max": 1,
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "red", "value": null }, { "color": "orange", "value": 0.25 }, { "color": "green", "value": 0.5 } ] }
+        }, "overrides": []
+      },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "showThresholdMarkers": true },
+      "targets": [ { "refId": "A", "expr": "clamp_min(slo:error_budget_remaining:ratio{slo=\"hello-availability\"}, 0)" } ]
+    },
+    {
+      "type": "stat", "title": "Burn rate: 1 ч / 6 ч", "id": 5,
+      "gridPos": { "h": 5, "w": 6, "x": 18, "y": 5 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "x", "decimals": 2,
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "orange", "value": 6 }, { "color": "red", "value": 14.4 } ] }
+        }, "overrides": []
+      },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "value", "textMode": "value_and_name" },
+      "targets": [
+        { "refId": "A", "expr": "slo:burn_rate:1h{slo=\"hello-availability\"}", "legendFormat": "1 ч" },
+        { "refId": "B", "expr": "slo:burn_rate:6h{slo=\"hello-availability\"}", "legendFormat": "6 ч" }
+      ]
+    },
+    {
+      "type": "timeseries", "title": "Доля ошибок по окнам и порог SLO", "id": 6,
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 10 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": { "unit": "percentunit", "decimals": 3, "custom": { "fillOpacity": 5 } },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "бюджет 0,1%" }, "properties": [ { "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } }, { "id": "custom.lineStyle", "value": { "fill": "dash", "dash": [10, 10] } } ] }
+        ]
+      },
+      "targets": [
+        { "refId": "A", "expr": "slo:sli_error:ratio_rate5m{slo=\"hello-availability\"}", "legendFormat": "5 мин" },
+        { "refId": "B", "expr": "slo:sli_error:ratio_rate1h{slo=\"hello-availability\"}", "legendFormat": "1 ч" },
+        { "refId": "C", "expr": "slo:sli_error:ratio_rate6h{slo=\"hello-availability\"}", "legendFormat": "6 ч" },
+        { "refId": "D", "expr": "1 - slo:objective:ratio{slo=\"hello-availability\"}", "legendFormat": "бюджет 0,1%" }
+      ]
+    },
+    {
+      "type": "timeseries", "title": "Burn rate и пороги алертов (14,4× / 6×)", "id": 7,
+      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 10 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "x", "decimals": 2,
+          "custom": { "thresholdsStyle": { "mode": "line+area" } },
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "transparent", "value": null }, { "color": "orange", "value": 6 }, { "color": "red", "value": 14.4 } ] }
+        }, "overrides": []
+      },
+      "targets": [
+        { "refId": "A", "expr": "slo:burn_rate:1h{slo=\"hello-availability\"}", "legendFormat": "burn rate 1 ч" },
+        { "refId": "B", "expr": "slo:burn_rate:6h{slo=\"hello-availability\"}", "legendFormat": "burn rate 6 ч" }
+      ]
+    },
+    {
+      "type": "timeseries", "title": "Запросы и ошибки (SLI-маршруты)", "id": 8,
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 19 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": { "unit": "reqps" },
+        "overrides": [ { "matcher": { "id": "byName", "options": "5xx" }, "properties": [ { "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } } ] } ]
+      },
+      "targets": [
+        { "refId": "A", "expr": "sum(rate(envoy_cluster_upstream_rq_total{envoy_cluster_name=~\"httproute/demo/hello/rule/[012]\"}[1m]))", "legendFormat": "все запросы" },
+        { "refId": "B", "expr": "sum(rate(envoy_cluster_upstream_rq_xx{envoy_cluster_name=~\"httproute/demo/hello/rule/[012]\",envoy_response_code_class=\"5\"}[1m])) or vector(0)", "legendFormat": "5xx" }
+      ]
+    }
+  ]
+}

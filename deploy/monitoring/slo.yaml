@@ -1,0 +1,106 @@
+# SLO доступности приложения через Gateway (методика Google SRE workbook,
+# «Alerting on SLOs»: multiwindow, multi-burn-rate).
+#
+# SLI: доля ответов НЕ 5xx по основным правилам маршрута demo/hello:
+#   #0 /canary, #1 /v2, #2 /   (правило #3 /error отдаёт 500 намеренно — исключено,
+#   #4 /limited — 429 от rate limit генерирует Envoy, в upstream-метрики не попадают).
+# SLO: 99,9 % → бюджет ошибок 0,1 %.
+# Окно бюджета — 3 дня: столько хранит Prometheus (retention 3d, emptyDir).
+# Классическое окно 30 дней требует постоянного хранилища (ограничение в README).
+#
+# Burn rate = доля ошибок / 0,001 (во сколько раз быстрее нормы тратится бюджет).
+#   Быстрое сгорание: burn rate > 14,4 за 1 ч и за 5 мин  → critical
+#   Медленное:        burn rate > 6    за 6 ч и за 30 мин → warning
+# Короткое окно подтверждает, что проблема продолжается сейчас (быстрое снятие алерта).
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: slo-hello-availability
+spec:
+  groups:
+    - name: devops-case.slo
+      interval: 30s
+      rules:
+        - record: slo:objective:ratio
+          expr: vector(0.999)
+          labels:
+            slo: hello-availability
+        # Доля ошибок по окнам (or vector(0) — нет 5xx, значит 0, а не «нет данных»)
+        - record: slo:sli_error:ratio_rate5m
+          expr: |
+            (sum(rate(envoy_cluster_upstream_rq_xx{envoy_cluster_name=~"httproute/demo/hello/rule/[012]",envoy_response_code_class="5"}[5m])) or vector(0))
+            /
+            sum(rate(envoy_cluster_upstream_rq_total{envoy_cluster_name=~"httproute/demo/hello/rule/[012]"}[5m]))
+          labels:
+            slo: hello-availability
+        - record: slo:sli_error:ratio_rate30m
+          expr: |
+            (sum(rate(envoy_cluster_upstream_rq_xx{envoy_cluster_name=~"httproute/demo/hello/rule/[012]",envoy_response_code_class="5"}[30m])) or vector(0))
+            /
+            sum(rate(envoy_cluster_upstream_rq_total{envoy_cluster_name=~"httproute/demo/hello/rule/[012]"}[30m]))
+          labels:
+            slo: hello-availability
+        - record: slo:sli_error:ratio_rate1h
+          expr: |
+            (sum(rate(envoy_cluster_upstream_rq_xx{envoy_cluster_name=~"httproute/demo/hello/rule/[012]",envoy_response_code_class="5"}[1h])) or vector(0))
+            /
+            sum(rate(envoy_cluster_upstream_rq_total{envoy_cluster_name=~"httproute/demo/hello/rule/[012]"}[1h]))
+          labels:
+            slo: hello-availability
+        - record: slo:sli_error:ratio_rate6h
+          expr: |
+            (sum(rate(envoy_cluster_upstream_rq_xx{envoy_cluster_name=~"httproute/demo/hello/rule/[012]",envoy_response_code_class="5"}[6h])) or vector(0))
+            /
+            sum(rate(envoy_cluster_upstream_rq_total{envoy_cluster_name=~"httproute/demo/hello/rule/[012]"}[6h]))
+          labels:
+            slo: hello-availability
+        - record: slo:sli_error:ratio_rate3d
+          expr: |
+            (sum(rate(envoy_cluster_upstream_rq_xx{envoy_cluster_name=~"httproute/demo/hello/rule/[012]",envoy_response_code_class="5"}[3d])) or vector(0))
+            /
+            sum(rate(envoy_cluster_upstream_rq_total{envoy_cluster_name=~"httproute/demo/hello/rule/[012]"}[3d]))
+          labels:
+            slo: hello-availability
+        # Доступность (SLI) и остаток бюджета ошибок за окно 3 дня
+        - record: slo:sli:availability_3d
+          expr: 1 - slo:sli_error:ratio_rate3d
+          labels:
+            slo: hello-availability
+        - record: slo:error_budget_remaining:ratio
+          expr: 1 - (slo:sli_error:ratio_rate3d{slo="hello-availability"} / 0.001)
+          labels:
+            slo: hello-availability
+        # Burn rate по окнам — для графиков
+        - record: slo:burn_rate:1h
+          expr: slo:sli_error:ratio_rate1h{slo="hello-availability"} / 0.001
+          labels:
+            slo: hello-availability
+        - record: slo:burn_rate:6h
+          expr: slo:sli_error:ratio_rate6h{slo="hello-availability"} / 0.001
+          labels:
+            slo: hello-availability
+
+        - alert: SLOErrorBudgetFastBurn
+          expr: |
+            slo:sli_error:ratio_rate1h{slo="hello-availability"} > (14.4 * 0.001)
+            and
+            slo:sli_error:ratio_rate5m{slo="hello-availability"} > (14.4 * 0.001)
+          for: 2m
+          labels:
+            severity: critical
+            slo: hello-availability
+          annotations:
+            summary: "Бюджет ошибок SLO 99,9% сгорает в 14,4 раза быстрее нормы"
+            description: "Доля 5xx за 1 ч: {{ $value | humanizePercentage }}. При таком темпе 2% месячного бюджета уходит за час."
+        - alert: SLOErrorBudgetSlowBurn
+          expr: |
+            slo:sli_error:ratio_rate6h{slo="hello-availability"} > (6 * 0.001)
+            and
+            slo:sli_error:ratio_rate30m{slo="hello-availability"} > (6 * 0.001)
+          for: 15m
+          labels:
+            severity: warning
+            slo: hello-availability
+          annotations:
+            summary: "Бюджет ошибок SLO 99,9% сгорает в 6 раз быстрее нормы"
+            description: "Доля 5xx за 6 ч: {{ $value | humanizePercentage }}. При таком темпе 5% месячного бюджета уходит за 6 часов."

@@ -12,12 +12,20 @@ resources:
   - envoy-monitors.yaml   # метрики Envoy Gateway (прокси и контроллер)
   - alerts.yaml           # алерты и recording rules
   - security-policy.yaml  # basic auth на Prometheus через Gateway
+  - slo.yaml              # SLO 99,9%: SLI, бюджет ошибок, burn-rate алерты
 
 # Дашборд Grafana: sidecar подхватывает ConfigMap с меткой grafana_dashboard=1
 configMapGenerator:
   - name: dashboard-gateway-app
     files:
       - dashboards/gateway-app.json
+    options:
+      disableNameSuffixHash: true
+      labels:
+        grafana_dashboard: "1"
+  - name: dashboard-slo
+    files:
+      - dashboards/slo.json
     options:
       disableNameSuffixHash: true
       labels:
