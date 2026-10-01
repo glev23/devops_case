@@ -186,6 +186,42 @@ else
   fail "запрос $gw_trace не найден в Loki"
 fi
 
+section "Grafana и маршрутизация по hostname"
+gw_host() { curl -s -m 10 -H "Host: $1" "${@:3}" "$GATEWAY_URL$2"; }
+
+graf_health=$(gw_host grafana.devops.test /api/health || true)
+if [[ $graf_health =~ \"database\":\ *\"ok\" ]]; then
+  ok "Host: grafana.devops.test → Grafana (api/health: database ok)"
+else
+  fail "Grafana через Gateway (Host: grafana.devops.test) не отвечает"
+fi
+
+prom_ready=$(gw_host prometheus.devops.test /-/ready -o /dev/null -w '%{http_code}' || true)
+if [[ $prom_ready == 200 ]]; then
+  ok "Host: prometheus.devops.test → Prometheus UI (/-/ready 200)"
+else
+  fail "Prometheus через Gateway (Host: prometheus.devops.test) вернул ${prom_ready:-нет ответа}"
+fi
+
+other=$(gw_host anything.devops.test / || true)
+if [[ $other == "Hello World! from hello-"* ]]; then
+  ok "любой другой Host → приложение (маршрут по умолчанию)"
+else
+  fail "маршрут по умолчанию на приложение не сработал: ${other:-<нет ответа>}"
+fi
+
+# Источники данных Grafana: Grafana сама обращается к Prometheus и Loki
+graf_pw=$(kubectl -n monitoring get secret grafana-admin -o jsonpath='{.data.admin-password}' | base64 -d)
+for ds in prometheus loki; do
+  ds_status=$(gw_host grafana.devops.test "/api/datasources/uid/$ds/health" -u "admin:$graf_pw" \
+    | python3 -c 'import json,sys; print(json.load(sys.stdin).get("status",""))' 2>/dev/null || true)
+  if [[ $ds_status == OK ]]; then
+    ok "Grafana → datasource $ds: OK"
+  else
+    fail "Grafana → datasource $ds: ${ds_status:-нет ответа}"
+  fi
+done
+
 echo
 if [[ $failed -eq 0 ]]; then
   printf '\033[32mВсе проверки пройдены\033[0m\n'

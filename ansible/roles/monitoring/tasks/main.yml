@@ -4,10 +4,15 @@
 - name: Create monitoring namespace
   kubernetes.core.k8s:
     kubeconfig: "{{ kubeconfig }}"
-    api_version: v1
-    kind: Namespace
-    name: monitoring
     state: present
+    definition:
+      apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: monitoring
+        labels:
+          # Разрешает маршрутам Grafana/Prometheus подключаться к Gateway main
+          gateway-access: "true"
 
 - name: Check Grafana admin secret
   kubernetes.core.k8s_info:
@@ -48,3 +53,10 @@
       - "{{ repo_root }}/helm-values/kube-prometheus-stack.yaml"
     wait: true
     wait_timeout: 15m
+
+- name: Apply Grafana and Prometheus routes
+  ansible.builtin.command: kubectl apply -k {{ repo_root }}/deploy/monitoring
+  environment:
+    KUBECONFIG: "{{ kubeconfig }}"
+  register: monitoring_routes_apply
+  changed_when: monitoring_routes_apply.stdout is search(' (created|configured)')

@@ -44,6 +44,23 @@ grafana:
     userKey: admin-user
     passwordKey: admin-password
   defaultDashboardsTimezone: browser
+  # Доступ через Gateway: http://grafana.devops.test:30080 (HTTPRoute в deploy/monitoring)
+  grafana.ini:
+    server:
+      domain: grafana.devops.test
+      root_url: http://grafana.devops.test:30080/
+    analytics:
+      reporting_enabled: false
+      check_for_updates: false
+  # Логи из Loki рядом с метриками: Explore → Loki
+  additionalDataSources:
+    - name: Loki
+      type: loki
+      uid: loki
+      url: http://loki.logging:3100
+      access: proxy
+      jsonData:
+        maxLines: 1000
   resources:
     requests:
       cpu: 20m
