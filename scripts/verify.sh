@@ -50,7 +50,7 @@ else
 fi
 
 sleep 2
-hits=$(kubectl -n demo logs -l app.kubernetes.io/name=hello --tail=200 | grep "$trace" | grep -c '"status":200' || true)
+hits=$(kubectl -n demo logs -l app.kubernetes.io/name=hello -c nginx --tail=200 | grep "$trace" | grep -c '"status":200' || true)
 if [[ $hits -ge 1 ]]; then
   ok "запрос $trace найден в access-логе приложения (JSON, status 200)"
 else
@@ -95,11 +95,61 @@ else
 fi
 
 sleep 2
-gw_hits=$(kubectl -n demo logs -l app.kubernetes.io/name=hello --tail=200 | grep "$gw_trace" | grep -c '"x_forwarded_for":"[0-9]' || true)
+gw_hits=$(kubectl -n demo logs -l app.kubernetes.io/name=hello -c nginx --tail=200 | grep "$gw_trace" | grep -c '"x_forwarded_for":"[0-9]' || true)
 if [[ $gw_hits -ge 1 ]]; then
   ok "запрос через Gateway дошёл до nginx (в логе есть X-Forwarded-For от Envoy)"
 else
   fail "запрос $gw_trace через Gateway не найден в логе nginx"
+fi
+
+section "Gateway API: path, несколько backend, traffic splitting, TLS"
+hdr() { curl -s -m 5 -D - -o /dev/null "$GATEWAY_URL$1" | tr -d '\r' | awk -F': ' -v h="$2" 'tolower($1) == tolower(h) {print $2}'; }
+
+v2_body=$(curl -s -m 5 "$GATEWAY_URL/v2" || true)
+if [[ $v2_body == "Hello World! from hello-v2-"* && $(hdr /v2 X-Backend) == v2 ]]; then
+  ok "/v2 → hello-v2 (URLRewrite /v2 → /, X-Backend: v2): $v2_body"
+else
+  fail "/v2 вернул: ${v2_body:-<нет ответа>}"
+fi
+if [[ $(hdr / X-Backend) == v1 ]]; then
+  ok "/ → hello v1 (ResponseHeaderModifier: X-Backend: v1)"
+else
+  fail "/ без заголовка X-Backend: v1"
+fi
+
+# Веса 80/20: из 100 запросов к /canary ожидаем ~20 ответов от hello-v2
+v1_hits=0; v2_hits=0
+for _ in $(seq 100); do
+  case $(curl -s -m 5 "$GATEWAY_URL/canary") in
+    "Hello World! from hello-v2-"*) v2_hits=$((v2_hits + 1)) ;;
+    "Hello World! from hello-"*)    v1_hits=$((v1_hits + 1)) ;;
+  esac
+done
+if (( v1_hits + v2_hits == 100 && v2_hits >= 8 && v2_hits <= 35 )); then
+  ok "/canary, веса 80/20: v1=$v1_hits, v2=$v2_hits из 100"
+else
+  fail "/canary, веса 80/20: v1=$v1_hits, v2=$v2_hits из 100 (ожидалось ~80/20)"
+fi
+
+err_code=$(curl -s -m 5 -o /dev/null -w '%{http_code}' "$GATEWAY_URL/error" || true)
+if [[ $err_code == 500 ]]; then
+  ok "/error → 500 (для метрик кодов ответа)"
+else
+  fail "/error вернул $err_code вместо 500"
+fi
+
+# HTTPS со строгой проверкой сертификата по CA из кластера (без -k)
+gw_ip=${GATEWAY_URL#*://}; gw_ip=${gw_ip%%:*}
+ca_file=$(mktemp)
+kubectl -n gateway get secret devops-test-tls -o jsonpath='{.data.ca\.crt}' | base64 -d > "$ca_file"
+tls_body=$(curl -s -m 5 --cacert "$ca_file" --resolve "hello.devops.test:30443:$gw_ip" https://hello.devops.test:30443/ || true)
+tls_issuer=$(curl -s -m 5 -v --cacert "$ca_file" --resolve "hello.devops.test:30443:$gw_ip" https://hello.devops.test:30443/ 2>&1 \
+  | sed -n 's/^\*  *issuer: //p' | head -1)
+rm -f "$ca_file"
+if [[ $tls_body == "Hello World! from hello-"* ]]; then
+  ok "https://hello.devops.test:30443/ → сертификат проверен (issuer: ${tls_issuer:-?})"
+else
+  fail "HTTPS через Gateway не прошёл проверку: ${tls_body:-<нет ответа>}"
 fi
 
 section "Мониторинг (Prometheus)"

@@ -2,6 +2,7 @@
 #   grafana.devops.test    → Grafana
 #   prometheus.devops.test → Prometheus UI (targets, PromQL)
 # Остальные hostname попадают на маршрут приложения (demo/hello без hostnames).
+# Подключены ко всем listener: HTTP :30080 и HTTPS :30443.
 # Значения по умолчанию (group, kind, weight) указаны явно — иначе
 # `kubectl apply` на CRD каждый раз сообщает configured.
 apiVersion: gateway.networking.k8s.io/v1
@@ -14,7 +15,6 @@ spec:
       kind: Gateway
       name: main
       namespace: gateway
-      sectionName: http
   hostnames:
     - grafana.devops.test
   rules:
@@ -39,7 +39,6 @@ spec:
       kind: Gateway
       name: main
       namespace: gateway
-      sectionName: http
   hostnames:
     - prometheus.devops.test
   rules:

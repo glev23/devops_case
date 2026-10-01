@@ -16,3 +16,19 @@ spec:
           selector:
             matchLabels:
               gateway-access: "true"
+    # HTTPS: TLS терминируется на Envoy, сертификат *.devops.test от cert-manager
+    - name: https
+      protocol: HTTPS
+      port: 443
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - group: ""
+            kind: Secret
+            name: devops-test-tls
+      allowedRoutes:
+        namespaces:
+          from: Selector
+          selector:
+            matchLabels:
+              gateway-access: "true"

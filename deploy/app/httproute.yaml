@@ -1,3 +1,11 @@
+# Маршрут приложения — по умолчанию для любого Host (hostnames не заданы).
+# Подключён ко всем listener Gateway main: HTTP :30080 и HTTPS :30443.
+#
+#   /canary/*  → 80% hello (v1), 20% hello-v2  (traffic splitting, префикс отрезается)
+#   /v2/*      → hello-v2                       (маршрут по path, префикс отрезается)
+#   /*         → hello (v1)
+# В ответ добавляется заголовок X-Backend с версией.
+#
 # Значения по умолчанию (group, kind, weight) указаны явно: иначе сервер
 # дописывает их в списки, и `kubectl apply` каждый раз сообщает configured.
 apiVersion: gateway.networking.k8s.io/v1
@@ -10,12 +18,64 @@ spec:
       kind: Gateway
       name: main
       namespace: gateway
-      sectionName: http
   rules:
     - matches:
         - path:
             type: PathPrefix
+            value: /canary
+      filters:
+        - type: URLRewrite
+          urlRewrite:
+            path:
+              type: ReplacePrefixMatch
+              replacePrefixMatch: /
+        - type: ResponseHeaderModifier
+          responseHeaderModifier:
+            set:
+              - name: X-Route
+                value: canary
+      backendRefs:
+        - group: ""
+          kind: Service
+          name: hello
+          port: 80
+          weight: 80
+        - group: ""
+          kind: Service
+          name: hello-v2
+          port: 80
+          weight: 20
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /v2
+      filters:
+        - type: URLRewrite
+          urlRewrite:
+            path:
+              type: ReplacePrefixMatch
+              replacePrefixMatch: /
+        - type: ResponseHeaderModifier
+          responseHeaderModifier:
+            set:
+              - name: X-Backend
+                value: v2
+      backendRefs:
+        - group: ""
+          kind: Service
+          name: hello-v2
+          port: 80
+          weight: 1
+    - matches:
+        - path:
+            type: PathPrefix
             value: /
+      filters:
+        - type: ResponseHeaderModifier
+          responseHeaderModifier:
+            set:
+              - name: X-Backend
+                value: v1
       backendRefs:
         - group: ""
           kind: Service

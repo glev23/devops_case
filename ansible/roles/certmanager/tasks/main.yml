@@ -1,0 +1,30 @@
+---
+# cert-manager: выпуск TLS-сертификата для HTTPS-listener Gateway.
+
+- name: Install cert-manager
+  kubernetes.core.helm:
+    kubeconfig: "{{ kubeconfig }}"
+    release_name: cert-manager
+    release_namespace: cert-manager
+    create_namespace: true
+    chart_ref: oci://quay.io/jetstack/charts/cert-manager
+    chart_version: "{{ cert_manager_version }}"
+    values:
+      crds:
+        enabled: true
+      resources:
+        requests:
+          cpu: 10m
+          memory: 48Mi
+      webhook:
+        resources:
+          requests:
+            cpu: 10m
+            memory: 24Mi
+      cainjector:
+        resources:
+          requests:
+            cpu: 10m
+            memory: 48Mi
+    wait: true
+    wait_timeout: 10m

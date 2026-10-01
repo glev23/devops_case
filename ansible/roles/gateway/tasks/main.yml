@@ -19,6 +19,14 @@
   register: gateway_apply
   changed_when: gateway_apply.stdout is search(' (created|configured)')
 
+- name: Wait for TLS certificate
+  ansible.builtin.command: >
+    kubectl -n gateway wait certificate/devops-test-tls
+    --for=condition=Ready --timeout=300s
+  environment:
+    KUBECONFIG: "{{ kubeconfig }}"
+  changed_when: false
+
 - name: Wait for Gateway to be programmed
   ansible.builtin.command: >
     kubectl -n gateway wait gateway/main

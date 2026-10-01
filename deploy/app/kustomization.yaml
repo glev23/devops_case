@@ -9,13 +9,6 @@ labels:
 
 resources:
   - namespace.yaml
-  - deployment.yaml
-  - service.yaml
+  - base        # hello (v1): 2 реплики
+  - v2          # hello-v2: 1 реплика
   - httproute.yaml
-  - servicemonitor.yaml
-
-# Хэш в имени ConfigMap: изменение nginx.conf само перезапускает поды
-configMapGenerator:
-  - name: hello-nginx
-    files:
-      - nginx.conf

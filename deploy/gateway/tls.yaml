@@ -1,0 +1,58 @@
+# TLS для Gateway: собственная цепочка CA через cert-manager.
+#   selfsigned (ClusterIssuer) → devops-ca (CA-сертификат) → devops-ca (ClusterIssuer)
+#   → devops-test-tls (*.devops.test) — сертификат HTTPS-listener Gateway.
+# Ключи генерирует cert-manager в кластере, в репозитории их нет.
+# CA для проверки клиентом:
+#   kubectl -n gateway get secret devops-test-tls -o jsonpath='{.data.ca\.crt}' | base64 -d > ca.crt
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: selfsigned
+spec:
+  selfSigned: {}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: devops-ca
+  namespace: cert-manager
+spec:
+  isCA: true
+  commonName: devops-case CA
+  secretName: devops-ca
+  duration: 87600h      # 10 лет
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  issuerRef:
+    group: cert-manager.io
+    kind: ClusterIssuer
+    name: selfsigned
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: devops-ca
+spec:
+  ca:
+    secretName: devops-ca
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: devops-test-tls
+  namespace: gateway
+spec:
+  secretName: devops-test-tls
+  dnsNames:
+    - devops.test
+    - "*.devops.test"
+  duration: 2160h       # 90 дней, cert-manager продлевает автоматически
+  renewBefore: 360h
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  issuerRef:
+    group: cert-manager.io
+    kind: ClusterIssuer
+    name: devops-ca

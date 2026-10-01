@@ -24,6 +24,9 @@ calico_version: "v3.32.2"
 # Gateway API: Envoy Gateway (чарт несёт CRD Gateway API v1.6.1)
 envoy_gateway_version: "v1.9.2"
 
+# TLS для Gateway (поддерживает Kubernetes 1.33–1.36)
+cert_manager_version: "v1.21.2"
+
 # Мониторинг: Prometheus Operator v0.94.1, Prometheus, Alertmanager, Grafana
 kube_prometheus_stack_version: "91.8.2"
 

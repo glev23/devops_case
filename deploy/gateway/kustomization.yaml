@@ -10,4 +10,5 @@ resources:
   - namespace.yaml
   - envoyproxy.yaml
   - gatewayclass.yaml
+  - tls.yaml
   - gateway.yaml

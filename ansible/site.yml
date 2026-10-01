@@ -12,6 +12,7 @@
   hosts: k8s
   become: true
   roles:
+    - certmanager
     - gateway
     - monitoring
     - logging

@@ -9,7 +9,8 @@
   changed_when: app_apply.stdout is search(' (created|configured)')
 
 - name: Wait for demo application rollout
-  ansible.builtin.command: kubectl -n demo rollout status deployment/hello --timeout=300s
+  ansible.builtin.command: kubectl -n demo rollout status deployment/{{ item }} --timeout=300s
   environment:
     KUBECONFIG: "{{ kubeconfig }}"
   changed_when: false
+  loop: [hello, hello-v2]

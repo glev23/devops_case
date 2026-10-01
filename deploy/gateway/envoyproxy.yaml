@@ -1,5 +1,6 @@
 # Параметры прокси для GatewayClass eg: на bare-metal нет облачного
-# LoadBalancer, поэтому прокси публикуется через NodePort с фиксированным портом.
+# LoadBalancer, поэтому прокси публикуется через NodePort с фиксированными
+# портами: HTTP 80 → 30080, HTTPS 443 → 30443.
 apiVersion: gateway.envoyproxy.io/v1alpha1
 kind: EnvoyProxy
 metadata:
@@ -18,3 +19,5 @@ spec:
               ports:
                 - port: 80
                   nodePort: 30080
+                - port: 443
+                  nodePort: 30443
