@@ -17,13 +17,13 @@ spec:
     - group: gateway.networking.k8s.io
       kind: Gateway
       name: main
+  # requestHeadersReceivedTimeout и tlsHandshakeTimeout (EG 1.9) не используются:
+  # их ещё нет в схемах CRDs-catalog, по которым kubeconform валидирует в CI.
+  # requestReceivedTimeout ограничивает приём всего запроса, включая заголовки.
   timeout:
     http:
-      requestHeadersReceivedTimeout: 10s
       requestReceivedTimeout: 30s
       idleTimeout: 300s
-    tcp:
-      tlsHandshakeTimeout: 10s
   connection:
     connectionLimit:
       value: 10000
