@@ -99,6 +99,11 @@
 | `SEC` | Надёжность и безопасность | architecture.md §10 |
 | `CI` | CI/CD pipeline | architecture.md §11 |
 | `GRAF` | Grafana: доступ, datasources, дашборды | architecture.md §6, §7 |
+| `SLO` | SLI/SLO, бюджет ошибок, burn-rate алерты | architecture.md §6 |
+| `CD` | GitOps-доставка (Argo CD) | architecture.md §8, §11 |
+| `ROLLOUT` | Прогрессивная доставка: canary, анализ, откат | architecture.md §5, §8 |
+| `TRACE` | Распределённый трейсинг | architecture.md §6, §7 |
+| `DEMO` | Сценарий демонстрации | паспорт, очный финал |
 | `QA` | Прогон с нуля на чистой ОС | кейс, пп. 6, 7 |
 | `PASSPORT` | Паспорт решения | кейс — «Требования к паспорту проекта» |
 | `SUBMIT` | Репозиторий, архив, отправка | кейс — «Требования к сдаче решения» |
@@ -120,6 +125,13 @@
 | [GRAF-001](./graf-001.md) | `done` |
 | [GW-002](./gw-002.md) | `done` |
 | [MON-002](./mon-002.md) | `done` |
+| [GW-003](./gw-003.md) | `ready` |
+| [SEC-001](./sec-001.md) | `planned` |
+| [SLO-001](./slo-001.md) | `planned` |
+| [CD-001](./cd-001.md) | `planned` |
+| [ROLLOUT-001](./rollout-001.md) | `planned` |
+| [TRACE-001](./trace-001.md) | `planned` |
+| [DEMO-001](./demo-001.md) | `planned` |
 | [CI-001](./ci-001.md) | `done` |
 
 Статусы в этой таблице справочные — канонические только в `progress_dev.md`.

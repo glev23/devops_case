@@ -288,10 +288,33 @@ VPN без публичного адреса, а self-hosted runner на лич�
 | D-06 | Коллектор логов и хранилище | Fluentd / Fluent Bit + Fluentd / Filebeat; Loki, Elasticsearch/OpenSearch, файл/stdout | кейс разрешает только Fluentd или Filebeat; ресурсы хранилища; удобство поиска для эксперта | ✅ Fluentd → Loki → Grafana |
 | D-07 | Инструмент автоматизации | Makefile + shell, Ansible, Helmfile, Terraform, Kustomize | идемпотентность, число команд у эксперта, покрытие bootstrap узла | ✅ Makefile + Ansible + Helm + Kustomize |
 | D-08 | CI/CD | GitHub Actions, GitLab CI, без CI | где будет лежать репозиторий, время до дедлайна | ✅ GitHub Actions |
+| D-09 | CD в кластер | push через self-hosted runner, GitOps (Argo CD, Flux) | стенд за NAT/VPN, безопасность публичного репозитория, UI для демонстрации | ✅ Argo CD (pull), план — CD-001 |
+| D-10 | Прогрессивная доставка | Argo Rollouts + плагин Gateway API, Flagger, ручные веса | работа с Gateway API, анализ по Prometheus, сочетание с Argo CD | ✅ Argo Rollouts, план — ROLLOUT-001 |
+| D-11 | Трейсинг | Tempo, Jaeger; через OTel Collector или напрямую | одна Grafana для всего, RAM | ✅ Tempo, OTLP напрямую от Envoy, план — TRACE-001 |
+| D-12 | SLO | Sloth, Pyrra, правила вручную | прозрачность для эксперта, без лишних компонентов | ✅ правила вручную, план — SLO-001 |
 
 ---
 
 ## История решений
+
+**[01.10.2026] «Вау»-пакет (D-09…D-12).** База готова за первый день, до
+дедлайна 3,5 дня — запланированы дополнительные возможности с упором на
+впечатление и критерии 1, 3, 5. Отбор: каждая возможность воспроизводится
+у эксперта той же командой, проверяется в `verify.sh` и CI, укладывается в
+8 ГБ RAM (сейчас занято ~3,5–4 ГБ, добавится ~1–1,5 ГБ).
+- **D-09 Argo CD:** pull-модель снимает причину, по которой CD на стенд был
+  отклонён в CI-001 (нет входящих подключений). Режим без GitOps
+  (`gitops_enabled: false`) сохраняется.
+- **D-10 Argo Rollouts:** canary поверх тех же весов Gateway API, анализ по
+  Prometheus, естественно сочетается с Argo CD. Flagger тоже умеет Gateway
+  API, но с Argo CD в одной экосистеме проще разрешить конфликт владения
+  весами (`ignoreDifferences`).
+- **D-11 Tempo, OTLP напрямую:** без OTel Collector — меньше RAM; Grafana
+  уже есть.
+- **D-12 SLO правилами вручную:** эксперт видит все формулы, нет лишнего
+  компонента.
+- Отклонено: многоузловой кластер (риск для воспроизводимости, CI не
+  проверит), уведомления в Telegram (нужен токен, эксперт не проверит).
 
 **[30.09.2026] CI: полный kubeadm на GitHub-раннере вместо kind.** Раннер
 `ubuntu-24.04` — это полноценная VM с sudo, поэтому `e2e` гоняет весь
