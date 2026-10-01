@@ -127,8 +127,8 @@
 | [MON-002](./mon-002.md) | `done` |
 | [GW-003](./gw-003.md) | `done` |
 | [SEC-001](./sec-001.md) | `done` |
-| [SLO-001](./slo-001.md) | `ready` |
-| [CD-001](./cd-001.md) | `planned` |
+| [SLO-001](./slo-001.md) | `done` |
+| [CD-001](./cd-001.md) | `ready` |
 | [ROLLOUT-001](./rollout-001.md) | `planned` |
 | [TRACE-001](./trace-001.md) | `planned` |
 | [DEMO-001](./demo-001.md) | `planned` |

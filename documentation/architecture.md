@@ -149,6 +149,7 @@ breaker, local rate limit 5 запросов/с на `/limited` → 429;
 | Алерты (MON-002) | `PrometheusRule devops-case`: приложение (targets, реплики), Gateway (5xx > 10%, p95 > 500 мс, прокси), Fluentd, Loki; recording rules по маршрутам |
 | Дашборд (MON-002) | «DevOps case / Gateway и приложение» — JSON в `deploy/monitoring/dashboards/`, ConfigMap с `grafana_dashboard: "1"` |
 | Фоновая нагрузка | `demo/loadgen`: ~4 запроса/с через Gateway, графики живые сразу после установки |
+| SLO (SLO-001) | SLI — доля не-5xx по правилам `/canary`, `/v2`, `/` (Envoy); SLO 99,9%, бюджет 0,1% за 3 дня; burn-rate алерты 14,4× (1 ч + 5 мин) и 6× (6 ч + 30 мин); дашборд «SLO доступности» |
 | Хранение | emptyDir, retention 3 дня / 4 ГБ: в кластере нет StorageClass |
 | Grafana | пароль admin случайный, создаётся один раз в Secret `monitoring/grafana-admin`; пароль чарта по умолчанию не работает |
 | Проверка | `/targets` в Prometheus + конкретные PromQL-запросы с ожидаемым результатом (MON-001) |
@@ -276,6 +277,8 @@ VPN без публичного адреса, а self-hosted runner на лич�
   github.com, get.helm.sh; офлайн-установка не поддерживается.
 - Пул IP подов Calico задаётся при первой установке; смена `pod_cidr` на
   существующем кластере не поддерживается, нужна переустановка.
+- Окно бюджета ошибок SLO — 3 дня (retention Prometheus), а не классические
+  30 дней: для 30 дней нужно постоянное хранилище.
 - Метрики Prometheus и логи Loki хранятся в emptyDir: при пересоздании пода
   история теряется (нет StorageClass; для продакшена нужен PV).
 - Fluentd работает от root (uid 0) — файлы логов контейнеров принадлежат root;
