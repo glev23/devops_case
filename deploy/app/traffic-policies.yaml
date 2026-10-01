@@ -1,0 +1,54 @@
+# Политики трафика Envoy Gateway для маршрута приложения demo/hello.
+#
+# - таймауты: запрос к backend не дольше 5 с, подключение — 2 с;
+# - ретраи ТОЛЬКО на сетевые сбои (обрыв, отказ в подключении): ретраи на
+#   5xx замаскировали бы ошибки плохого релиза и сломали бы анализ canary
+#   (ROLLOUT-001);
+# - circuit breaker: ограничение соединений и очереди к backend — перегрузка
+#   одного backend не превращается в лавину ожидающих запросов;
+# - rate limit: только путь /limited, 5 запросов/с — сверх лимита 429.
+#   На остальной трафик (loadgen, проверки) лимит не действует.
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: BackendTrafficPolicy
+metadata:
+  name: hello
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: hello
+  timeout:
+    http:
+      requestTimeout: 5s
+    tcp:
+      connectTimeout: 2s
+  retry:
+    numRetries: 2
+    retryOn:
+      triggers:
+        - connect-failure
+        - reset
+        - refused-stream
+    perRetry:
+      timeout: 2s
+      backOff:
+        baseInterval: 100ms
+        maxInterval: 1s
+  circuitBreaker:
+    maxConnections: 1024
+    maxPendingRequests: 128
+    maxParallelRequests: 1024
+    maxParallelRetries: 16
+  rateLimit:
+    type: Local
+    local:
+      rules:
+        - clientSelectors:
+            - path:
+                # invert указан явно (значение по умолчанию) — идемпотентность apply
+                invert: false
+                type: PathPrefix
+                value: /limited
+          limit:
+            requests: 5
+            unit: Second

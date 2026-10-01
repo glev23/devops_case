@@ -1,10 +1,14 @@
 # Маршрут приложения — по умолчанию для любого Host (hostnames не заданы).
 # Подключён ко всем listener Gateway main: HTTP :30080 и HTTPS :30443.
 #
-#   /canary/*  → 80% hello (v1), 20% hello-v2  (traffic splitting, префикс отрезается)
-#   /v2/*      → hello-v2                       (маршрут по path, префикс отрезается)
-#   /*         → hello (v1)
+#   #0 /canary/*  → 80% hello (v1), 20% hello-v2  (traffic splitting, префикс отрезается)
+#   #1 /v2/*      → hello-v2                       (маршрут по path, префикс отрезается)
+#   #2 /*         → hello (v1)
+#   #3 /error     → hello, отвечает 500 — отдельное правило, чтобы намеренные
+#                   ошибки не попадали в SLI основного маршрута (SLO-001, ROLLOUT-001)
+#   #4 /limited/* → hello, rate limit 5 запросов/с (traffic-policies.yaml) → 429
 # В ответ добавляется заголовок X-Backend с версией.
+# Новые правила добавляются в конец: номер правила = метка route на дашборде.
 #
 # Значения по умолчанию (group, kind, weight) указаны явно: иначе сервер
 # дописывает их в списки, и `kubectl apply` каждый раз сообщает configured.
@@ -76,6 +80,37 @@ spec:
             set:
               - name: X-Backend
                 value: v1
+      backendRefs:
+        - group: ""
+          kind: Service
+          name: hello
+          port: 80
+          weight: 1
+    - matches:
+        - path:
+            type: Exact
+            value: /error
+      backendRefs:
+        - group: ""
+          kind: Service
+          name: hello
+          port: 80
+          weight: 1
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /limited
+      filters:
+        - type: URLRewrite
+          urlRewrite:
+            path:
+              type: ReplacePrefixMatch
+              replacePrefixMatch: /
+        - type: ResponseHeaderModifier
+          responseHeaderModifier:
+            set:
+              - name: X-Route
+                value: limited
       backendRefs:
         - group: ""
           kind: Service

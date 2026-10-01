@@ -12,4 +12,5 @@ resources:
   - base        # hello (v1): 2 реплики
   - v2          # hello-v2: 1 реплика
   - httproute.yaml
+  - traffic-policies.yaml   # таймауты, ретраи, circuit breaker, rate limit
   - loadgen.yaml   # фоновая нагрузка для графиков

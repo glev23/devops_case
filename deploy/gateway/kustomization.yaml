@@ -12,3 +12,4 @@ resources:
   - gatewayclass.yaml
   - tls.yaml
   - gateway.yaml
+  - client-policy.yaml

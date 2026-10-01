@@ -152,6 +152,39 @@ else
   fail "HTTPS через Gateway не прошёл проверку: ${tls_body:-<нет ответа>}"
 fi
 
+section "Политики трафика Gateway (Envoy Gateway)"
+# Политика принята: условие Accepted у предка (Gateway) в status.ancestors
+policy_ok() {
+  kubectl get "$@" -o jsonpath='{.status.ancestors[0].conditions[?(@.type=="Accepted")].status}' 2>/dev/null
+}
+if [[ $(policy_ok -n demo backendtrafficpolicy hello) == True ]]; then
+  ok "BackendTrafficPolicy demo/hello: Accepted (таймауты, ретраи на сетевые сбои, circuit breaker, rate limit)"
+else
+  fail "BackendTrafficPolicy demo/hello не принята"
+fi
+if [[ $(policy_ok -n gateway clienttrafficpolicy main) == True ]]; then
+  ok "ClientTrafficPolicy gateway/main: Accepted (таймауты клиента, лимит соединений, X-Request-Id)"
+else
+  fail "ClientTrafficPolicy gateway/main не принята"
+fi
+
+# Rate limit: 30 запросов подряд к /limited — первые проходят, остальные 429
+limited_codes=$(for _ in $(seq 30); do curl -s -o /dev/null -m 5 -w '%{http_code}\n' "$GATEWAY_URL/limited"; done | sort | uniq -c | awk '{printf "%s×%s ", $2, $1}')
+if [[ $limited_codes == *"200×"* && $limited_codes == *"429×"* ]]; then
+  ok "/limited, лимит 5 запросов/с: $limited_codes"
+else
+  fail "/limited: rate limit не сработал ($limited_codes)"
+fi
+limited_hdr=$(curl -s -m 5 -D - -o /dev/null "$GATEWAY_URL/limited" | tr -d '\r' | grep -i '^x-ratelimit-limit' || true)
+[[ -n $limited_hdr ]] && ok "заголовок ответа: $limited_hdr"
+
+# /error — отдельное правило (#3): его 500 не попадают в основной маршрут (#2)
+if [[ $(hdr /error X-Backend) == "" && $(curl -s -m 5 -o /dev/null -w '%{http_code}' "$GATEWAY_URL/error") == 500 ]]; then
+  ok "/error обслуживается отдельным правилом маршрута (без X-Backend правила /), 500"
+else
+  fail "/error попадает в правило / — намеренные 500 испортят SLI"
+fi
+
 section "Мониторинг (Prometheus)"
 PROM_URL="http://kps-prometheus.monitoring:9090/api/v1/query"
 # Все PromQL-запросы одним подом; каждый ответ — одна JSON-строка

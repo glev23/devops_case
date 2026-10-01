@@ -1,0 +1,32 @@
+# Политика клиентских соединений Gateway main (сторона «клиент → Envoy»).
+# - таймауты: медленный клиент не держит соединение и заголовки бесконечно;
+# - лимит одновременных соединений на listener;
+# - заголовки с подчёркиваниями отклоняются (защита от подмены заголовков,
+#   которые backend может трактовать как другие);
+# - X-Request-Id клиента сохраняется (иначе генерируется) — сквозной
+#   идентификатор запроса в логах nginx и Loki.
+# X-Forwarded-For от клиента не доверяем (numTrustedHops не задан): Gateway —
+# первая точка входа, IP клиента берётся из соединения.
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: ClientTrafficPolicy
+metadata:
+  name: main
+  namespace: gateway
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: main
+  timeout:
+    http:
+      requestHeadersReceivedTimeout: 10s
+      requestReceivedTimeout: 30s
+      idleTimeout: 300s
+    tcp:
+      tlsHandshakeTimeout: 10s
+  connection:
+    connectionLimit:
+      value: 10000
+  headers:
+    withUnderscoresAction: RejectRequest
+    requestID: PreserveOrGenerate

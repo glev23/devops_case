@@ -61,7 +61,7 @@
     },
     {
       "type": "timeseries", "title": "Запросы/с по маршрутам HTTPRoute", "id": 5,
-      "description": "demo/hello#0 — /canary (80/20), #1 — /v2, #2 — /; monitoring/* — Grafana и Prometheus по hostname.",
+      "description": "demo/hello#0 — /canary (80/20), #1 — /v2, #2 — /, #3 — /error (намеренные 500), #4 — /limited (rate limit); monitoring/* — Grafana и Prometheus по hostname.",
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": { "defaults": { "unit": "reqps", "custom": { "fillOpacity": 10 } }, "overrides": [] },
