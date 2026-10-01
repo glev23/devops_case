@@ -114,7 +114,15 @@ DNS-прокси Default Switch: тот отвечал через раз. IP VM 
 (маршрут без `hostnames`). Проверка — `curl -H "Host: …"`, без внешнего DNS;
 домен `.test` зарезервирован RFC 2606.
 
-Расширенные возможности (GW-002): маршруты по path, два backend `v1`/`v2`
+Расширенные возможности (GW-002, сделано): `/v2` → `hello-v2` с
+`URLRewrite`; `/canary` → веса 80/20 между `hello` и `hello-v2`;
+`ResponseHeaderModifier` (`X-Backend`, `X-Route`); `/error` → 500; HTTPS-
+listener `:443` → NodePort 30443, сертификат `*.devops.test` от cert-manager
+v1.21.2 через собственную цепочку CA (`selfsigned` → `devops-ca` →
+`devops-test-tls`), проверка клиентом по `ca.crt` без `-k`. Маршруты
+подключены к обоим listener. Подробности — tasks/gw-002.md.
+
+Исходный план GW-002: маршруты по path, два backend `v1`/`v2`
 с весами 80/20, маршрут, отвечающий 500 (для графика кодов), TLS-listener с
 сертификатом от cert-manager (self-signed `ClusterIssuer`, ключи не попадают
 в репозиторий). MetalLB вместо NodePort — только если останется время.

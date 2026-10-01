@@ -72,7 +72,9 @@ Ubuntu 24.04 и частично заменяет ручной QA.
 
 **GRAF-001 закрыта** (01.10.2026) — [graf-001.md](./tasks/graf-001.md): Grafana и Prometheus через Gateway по hostname, datasource Loki; e2e 5 мин 57 с.
 
-**Дальше:** GW-002 (path, веса, TLS), MON-002, SEC-001; затем AUTO-001/QA-001 и материалы сдачи.
+**GW-002 закрыта** (01.10.2026) — [gw-002.md](./tasks/gw-002.md): `/v2`, `/canary` 80/20, заголовки, `/error`, HTTPS через cert-manager; e2e 6 мин 47 с.
+
+**Дальше:** MON-002 (дашборд Envoy, нагрузка), SEC-001; затем AUTO-001/QA-001 и материалы сдачи.
 
 ## Очередь выполнения
 
@@ -98,7 +100,7 @@ Ubuntu 24.04 и частично заменяет ручной QA.
 
 | № | Задача | Статус | Зависимости | Законченный результат |
 |---:|---|---|---|---|
-| 90 | GW-002 | `ready` | GW-001 | Маршруты по path, несколько backend, traffic splitting по весам, TLS — у каждого есть `curl`-проверка (по hostname — сделано в GRAF-001) |
+| 90 | [GW-002](./tasks/gw-002.md) | `done` | GW-001 | Маршруты по path, несколько backend, traffic splitting по весам, TLS — у каждого есть `curl`-проверка (по hostname — сделано в GRAF-001) |
 | 95 | [GRAF-001](./tasks/graf-001.md) | `done` | MON-001, LOG-001, GW-001 | Grafana из kube-prometheus-stack: datasources Prometheus + Loki, готовые дашборды кластера (CPU/RAM), доступ через Gateway (`HTTPRoute`), пароль admin — из сгенерированного Secret, не из репозитория |
 | 100 | MON-002 | `ready` | MON-001, GW-001, GRAF-001 | HTTP-метрики Envoy (запросы, коды, latency) + свой дашборд JSON в репозитории |
 | 110 | SEC-001 | `planned` | APP-001 | requests/limits, probes, securityContext, реплики + PDB, NetworkPolicy |
