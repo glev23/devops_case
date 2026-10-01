@@ -1,0 +1,21 @@
+# Basic auth для Prometheus UI через Gateway (prometheus.devops.test).
+# У Prometheus нет своей аутентификации, а маршрут открыт через NodePort.
+# Secret prometheus-basic-auth (ключ .htpasswd) создаёт Ansible один раз со
+# случайным паролем — в репозитории его нет. Envoy поддерживает только формат
+# {SHA}, поэтому пароль длинный и случайный (24 символа).
+# Grafana и проверки ходят в Prometheus напрямую по Service — не затрагиваются.
+# Пароль: kubectl -n monitoring get secret prometheus-basic-auth -o jsonpath='{.data.password}' | base64 -d
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: SecurityPolicy
+metadata:
+  name: prometheus-basic-auth
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: prometheus
+  basicAuth:
+    users:
+      group: ""
+      kind: Secret
+      name: prometheus-basic-auth

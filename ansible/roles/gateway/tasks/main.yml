@@ -13,11 +13,10 @@
     wait_timeout: 10m
 
 - name: Apply GatewayClass, EnvoyProxy and Gateway
-  ansible.builtin.command: kubectl apply -k {{ repo_root }}/deploy/gateway
-  environment:
-    KUBECONFIG: "{{ kubeconfig }}"
-  register: gateway_apply
-  changed_when: gateway_apply.stdout is search(' (created|configured)')
+  ansible.builtin.include_role:
+    name: kustomize
+  vars:
+    kustomize_dir: deploy/gateway
 
 - name: Wait for TLS certificate
   ansible.builtin.command: >

@@ -2,11 +2,10 @@
 # Демонстрационное приложение: Kustomize из deploy/app.
 
 - name: Apply demo application
-  ansible.builtin.command: kubectl apply -k {{ repo_root }}/deploy/app
-  environment:
-    KUBECONFIG: "{{ kubeconfig }}"
-  register: app_apply
-  changed_when: app_apply.stdout is search(' (created|configured)')
+  ansible.builtin.include_role:
+    name: kustomize
+  vars:
+    kustomize_dir: deploy/app
 
 - name: Wait for demo application rollout
   ansible.builtin.command: kubectl -n demo rollout status deployment/{{ item }} --timeout=300s

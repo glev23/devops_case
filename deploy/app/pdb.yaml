@@ -1,0 +1,12 @@
+# При добровольных прерываниях (drain узла, обновление) хотя бы одна реплика
+# hello (v1) остаётся доступной. Для hello-v2 (1 реплика) PDB не задаётся:
+# minAvailable 1 при одной реплике заблокировал бы drain узла.
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: hello
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: hello

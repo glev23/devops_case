@@ -1,0 +1,46 @@
+# Сетевая изоляция namespace demo (применяет Calico).
+# По умолчанию входящий трафик ко всем подам запрещён; разрешено только:
+#   - nginx :8080   — от прокси Envoy (envoy-gateway-system) и из самого demo;
+#   - exporter :9113 — от Prometheus (monitoring).
+# Пробы kubelet идут с узла — их NetworkPolicy не ограничивает.
+# Исходящий трафик не ограничивается (loadgen ходит в Gateway через узел).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: hello-allow-gateway-and-monitoring
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app.kubernetes.io/name
+        operator: In
+        values: [hello, hello-v2]
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: envoy-gateway-system
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/component: proxy
+        - podSelector: {}
+      ports:
+        - protocol: TCP
+          port: 8080
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - protocol: TCP
+          port: 9113

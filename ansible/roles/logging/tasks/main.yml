@@ -16,11 +16,10 @@
     wait_timeout: 10m
 
 - name: Apply Fluentd
-  ansible.builtin.command: kubectl apply -k {{ repo_root }}/deploy/logging
-  environment:
-    KUBECONFIG: "{{ kubeconfig }}"
-  register: logging_apply
-  changed_when: logging_apply.stdout is search(' (created|configured)')
+  ansible.builtin.include_role:
+    name: kustomize
+  vars:
+    kustomize_dir: deploy/logging
 
 - name: Wait for Fluentd rollout
   ansible.builtin.command: kubectl -n logging rollout status daemonset/fluentd --timeout=300s

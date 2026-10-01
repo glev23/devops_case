@@ -11,6 +11,7 @@ resources:
   - httproutes.yaml       # Grafana и Prometheus через Gateway по hostname
   - envoy-monitors.yaml   # метрики Envoy Gateway (прокси и контроллер)
   - alerts.yaml           # алерты и recording rules
+  - security-policy.yaml  # basic auth на Prometheus через Gateway
 
 # Дашборд Grafana: sidecar подхватывает ConfigMap с меткой grafana_dashboard=1
 configMapGenerator:

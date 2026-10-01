@@ -13,4 +13,6 @@ resources:
   - v2          # hello-v2: 1 реплика
   - httproute.yaml
   - traffic-policies.yaml   # таймауты, ретраи, circuit breaker, rate limit
+  - networkpolicy.yaml      # изоляция: к подам только Gateway, demo, Prometheus
+  - pdb.yaml                # минимум 1 реплика hello при drain
   - loadgen.yaml   # фоновая нагрузка для графиков

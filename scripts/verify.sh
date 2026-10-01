@@ -15,12 +15,13 @@ section() { printf '\n\033[1m== %s\033[0m\n' "$1"; }
 # Одноразовый под с curl внутри кластера; вывод читается через logs
 # (у `kubectl run -i` конец вывода может теряться).
 in_cluster() {
-  local name="verify-$RANDOM"
-  kubectl run "$name" --restart=Never --image="$CURL_IMAGE" --quiet \
-    --command -- sh -c "$1" >/dev/null
-  kubectl wait --for=jsonpath='{.status.phase}'=Succeeded "pod/$name" --timeout=120s >/dev/null || true
-  kubectl logs "$name"
-  kubectl delete pod "$name" --wait=false >/dev/null
+  # $1 — команда; $2 — namespace (по умолчанию demo: туда пускает NetworkPolicy)
+  local name="verify-$RANDOM" ns="${2:-demo}"
+  kubectl -n "$ns" run "$name" --restart=Never --image="$CURL_IMAGE" --quiet \
+    --labels=app.kubernetes.io/name=verify --command -- sh -c "$1" >/dev/null
+  kubectl -n "$ns" wait --for=jsonpath='{.status.phase}'=Succeeded "pod/$name" --timeout=120s >/dev/null || true
+  kubectl -n "$ns" logs "$name"
+  kubectl -n "$ns" delete pod "$name" --wait=false >/dev/null
 }
 
 section "Кластер"
@@ -279,11 +280,14 @@ else
   fail "Grafana через Gateway (Host: grafana.devops.test) не отвечает"
 fi
 
-prom_ready=$(gw_host prometheus.devops.test /-/ready -o /dev/null -w '%{http_code}' || true)
-if [[ $prom_ready == 200 ]]; then
-  ok "Host: prometheus.devops.test → Prometheus UI (/-/ready 200)"
+# Prometheus через Gateway закрыт basic auth (SecurityPolicy): без пароля 401, с паролем 200
+prom_pw=$(kubectl -n monitoring get secret prometheus-basic-auth -o jsonpath='{.data.password}' | base64 -d)
+prom_noauth=$(gw_host prometheus.devops.test /-/ready -o /dev/null -w '%{http_code}' || true)
+prom_auth=$(gw_host prometheus.devops.test /-/ready -o /dev/null -w '%{http_code}' -u "admin:$prom_pw" || true)
+if [[ $prom_noauth == 401 && $prom_auth == 200 ]]; then
+  ok "Host: prometheus.devops.test → Prometheus UI: без пароля 401, с паролем 200 (basic auth)"
 else
-  fail "Prometheus через Gateway (Host: prometheus.devops.test) вернул ${prom_ready:-нет ответа}"
+  fail "Prometheus через Gateway: без пароля ${prom_noauth:-?}, с паролем ${prom_auth:-?} (ожидалось 401/200)"
 fi
 
 other=$(gw_host anything.devops.test / || true)
@@ -304,6 +308,28 @@ for ds in prometheus loki; do
     fail "Grafana → datasource $ds: ${ds_status:-нет ответа}"
   fi
 done
+
+section "Безопасность: NetworkPolicy, PDB"
+# Под из чужого namespace (default) не должен достучаться до приложения напрямую
+np_out=$(in_cluster "curl -s -m 4 -o /dev/null -w '%{http_code}' http://hello.demo/ || echo blocked" default)
+if [[ $np_out == *blocked* || $np_out == 000* ]]; then
+  ok "под из namespace default → hello.demo:80 заблокирован NetworkPolicy"
+else
+  fail "NetworkPolicy не блокирует доступ из default к hello.demo (ответ: $np_out)"
+fi
+np_in=$(in_cluster "curl -s -m 4 http://hello.demo/" demo)
+if [[ $np_in == "Hello World! from hello-"* ]]; then
+  ok "под из demo → hello.demo:80 разрешён"
+else
+  fail "под из demo не получил ответ от hello.demo: ${np_in:-<пусто>}"
+fi
+pdb_min=$(kubectl -n demo get pdb hello -o jsonpath='{.spec.minAvailable}' 2>/dev/null || true)
+pdb_allowed=$(kubectl -n demo get pdb hello -o jsonpath='{.status.disruptionsAllowed}' 2>/dev/null || true)
+if [[ $pdb_min == 1 ]]; then
+  ok "PodDisruptionBudget demo/hello: minAvailable=1, сейчас допустимо прерываний: ${pdb_allowed:-?}"
+else
+  fail "PodDisruptionBudget demo/hello не найден"
+fi
 
 section "HTTP-метрики Envoy, алерты, дашборд"
 # PodMonitor подхватывается не мгновенно (перезагрузка конфигурации Prometheus) — с повторами

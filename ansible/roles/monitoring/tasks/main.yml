@@ -41,6 +41,49 @@
   when: monitoring_grafana_secret.resources | length == 0
   no_log: true
 
+- name: Check Prometheus basic auth secret
+  kubernetes.core.k8s_info:
+    kubeconfig: "{{ kubeconfig }}"
+    kind: Secret
+    namespace: monitoring
+    name: prometheus-basic-auth
+  register: monitoring_prom_auth_secret
+
+# Пароль Prometheus UI через Gateway: генерируется один раз, хэш {SHA} — единственный
+# формат, который поддерживает basic auth в Envoy. Пароль хранится только в Secret.
+- name: Create Prometheus basic auth secret
+  when: monitoring_prom_auth_secret.resources | length == 0
+  no_log: true
+  block:
+    - name: Generate Prometheus password
+      ansible.builtin.set_fact:
+        monitoring_prom_password: "{{ lookup('ansible.builtin.password', '/dev/null', length=24, chars=['ascii_letters', 'digits']) }}"
+
+    - name: Hash Prometheus password for htpasswd
+      ansible.builtin.shell: set -o pipefail && printf '%s' "$PW" | openssl dgst -sha1 -binary | base64
+      args:
+        executable: /bin/bash
+      environment:
+        PW: "{{ monitoring_prom_password }}"
+      register: monitoring_prom_hash
+      changed_when: false
+
+    - name: Create secret prometheus-basic-auth
+      kubernetes.core.k8s:
+        kubeconfig: "{{ kubeconfig }}"
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Secret
+          metadata:
+            name: prometheus-basic-auth
+            namespace: monitoring
+          type: Opaque
+          stringData:
+            .htpasswd: "admin:{SHA}{{ monitoring_prom_hash.stdout }}"
+            username: admin
+            password: "{{ monitoring_prom_password }}"
+
 - name: Install kube-prometheus-stack
   kubernetes.core.helm:
     kubeconfig: "{{ kubeconfig }}"
@@ -55,8 +98,7 @@
     wait_timeout: 15m
 
 - name: Apply routes, Envoy monitors, alerts and dashboard
-  ansible.builtin.command: kubectl apply -k {{ repo_root }}/deploy/monitoring
-  environment:
-    KUBECONFIG: "{{ kubeconfig }}"
-  register: monitoring_routes_apply
-  changed_when: monitoring_routes_apply.stdout is search(' (created|configured)')
+  ansible.builtin.include_role:
+    name: kustomize
+  vars:
+    kustomize_dir: deploy/monitoring

@@ -1,0 +1,26 @@
+---
+# Применение Kustomize-каталога с честным определением изменений.
+# `kubectl diff` (серверный dry-run) сравнивает желаемое состояние с живым:
+# код 0 — различий нет. Разбирать вывод `kubectl apply` ненадёжно: для
+# некоторых типов (например, PodDisruptionBudget) он сообщает "configured"
+# при каждом запуске, даже когда ничего не меняется.
+# Любой ненулевой код diff — повод применить: 1 — есть различия, >1 — dry-run
+# не смог (например, namespace создаётся этим же каталогом на чистой установке);
+# настоящие ошибки покажет сам apply, лишние применения — проверка changed=0 в CI.
+#
+# Параметры: kustomize_dir — каталог относительно корня репозитория.
+
+- name: Diff {{ kustomize_dir }}
+  ansible.builtin.command: kubectl diff -k {{ repo_root }}/{{ kustomize_dir }}
+  environment:
+    KUBECONFIG: "{{ kubeconfig }}"
+  register: kustomize_diff
+  changed_when: false
+  failed_when: false
+
+- name: Apply {{ kustomize_dir }}
+  ansible.builtin.command: kubectl apply -k {{ repo_root }}/{{ kustomize_dir }}
+  environment:
+    KUBECONFIG: "{{ kubeconfig }}"
+  when: kustomize_diff.rc != 0
+  changed_when: true
