@@ -15,4 +15,28 @@ resources:
   - traffic-policies.yaml   # таймауты, ретраи, circuit breaker, rate limit
   - networkpolicy.yaml      # изоляция: к подам только Gateway, demo, Prometheus
   - pdb.yaml                # минимум 1 реплика hello при drain
-  - loadgen.yaml   # фоновая нагрузка для графиков
+  - loadgen.yaml            # фоновая нагрузка для графиков
+  - service-canary.yaml     # Service для canary-версии (ROLLOUT-001)
+  - analysis.yaml           # критерий успеха canary: доля 5xx в Prometheus
+
+# Deployment hello из base → Argo Rollout с canary-стратегией (ROLLOUT-001).
+# hello-v2 остаётся обычным Deployment.
+patches:
+  - path: rollout.yaml
+    target:
+      group: apps
+      version: v1
+      kind: Deployment
+      # По метке, а не по имени: имя сравнивается с исходным из base, и под
+      # фильтр попал бы и hello-v2 (до суффикса -v2 он тоже hello)
+      labelSelector: app.kubernetes.io/name=hello
+    options:
+      allowKindChange: true
+  # allowKindChange меняет только kind — группу API Rollout задаём отдельно
+  - target:
+      kind: Rollout
+      name: hello
+    patch: |-
+      - op: replace
+        path: /apiVersion
+        value: argoproj.io/v1alpha1

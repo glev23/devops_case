@@ -1,0 +1,23 @@
+# Критерий успеха canary-релиза: доля 5xx в правиле "/" маршрута demo/hello
+# (метрики Envoy Gateway) за последнюю минуту — меньше 2%.
+# Метрика общая для стабильной версии и canary: плохая версия на 10% трафика
+# с ~100% ошибок даёт ~10% 5xx на правиле — анализ это ловит. Нагрузку для
+# измерений даёт loadgen.
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: gateway-error-rate
+spec:
+  metrics:
+    - name: gateway-5xx-ratio
+      initialDelay: 30s
+      interval: 15s
+      failureLimit: 1
+      successCondition: result[0] < 0.02
+      provider:
+        prometheus:
+          address: http://kps-prometheus.monitoring:9090
+          query: |
+            (sum(rate(envoy_cluster_upstream_rq_xx{envoy_cluster_name="httproute/demo/hello/rule/2",envoy_response_code_class="5"}[1m])) or vector(0))
+            /
+            (sum(rate(envoy_cluster_upstream_rq_total{envoy_cluster_name="httproute/demo/hello/rule/2"}[1m])) > 0 or vector(1))

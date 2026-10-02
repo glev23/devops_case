@@ -1,0 +1,15 @@
+# Service для canary-версии hello. Argo Rollouts сам добавляет в селекторы
+# hello и hello-canary хэш шаблона пода (rollouts-pod-template-hash).
+apiVersion: v1
+kind: Service
+metadata:
+  name: hello-canary
+  labels:
+    app.kubernetes.io/name: hello-canary
+spec:
+  selector:
+    app.kubernetes.io/name: hello
+  ports:
+    - name: http
+      port: 80
+      targetPort: http

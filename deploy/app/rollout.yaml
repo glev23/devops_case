@@ -1,0 +1,35 @@
+# Прогрессивная доставка hello (ROLLOUT-001).
+# Deployment hello из base превращается в Argo Rollout этим патчем
+# (kustomization.yaml, allowKindChange) — шаблон пода общий с hello-v2.
+#
+# Новая версия получает трафик шагами через веса HTTPRoute demo/hello (правило /):
+#   10% → 45 с → 30% → 45 с → 60% → 45 с → 100%.
+# Фоновый анализ (AnalysisTemplate gateway-error-rate) с первого шага каждые
+# 15 с проверяет долю 5xx в Prometheus; два провала подряд — автоматический
+# откат: весь трафик возвращается на стабильную версию.
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: hello
+spec:
+  revisionHistoryLimit: 3
+  strategy:
+    canary:
+      stableService: hello
+      canaryService: hello-canary
+      trafficRouting:
+        plugins:
+          argoproj-labs/gatewayAPI:
+            httpRoute: hello
+            namespace: demo
+      analysis:
+        templates:
+          - templateName: gateway-error-rate
+        startingStep: 1
+      steps:
+        - setWeight: 10
+        - pause: {duration: 45s}
+        - setWeight: 30
+        - pause: {duration: 45s}
+        - setWeight: 60
+        - pause: {duration: 45s}

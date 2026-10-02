@@ -47,4 +47,10 @@
   environment:
     KUBECONFIG: "{{ kubeconfig }}"
   changed_when: false
-  loop: [hello, hello-v2, loadgen]
+  loop: [hello-v2, loadgen]
+
+- name: Wait for Argo Rollout hello to be healthy
+  ansible.builtin.command: kubectl argo rollouts status hello -n demo --timeout 300s
+  environment:
+    KUBECONFIG: "{{ kubeconfig }}"
+  changed_when: false

@@ -1,0 +1,19 @@
+# Метрики nginx-exporter напрямую с подов (а не через Service): во время
+# canary-релиза Argo Rollouts сужает селектор Service hello до стабильных подов,
+# и canary-поды выпали бы из мониторинга. job = значение метки
+# app.kubernetes.io/name (hello / hello-v2), версия и хэш шаблона — в метках метрик.
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: hello
+spec:
+  jobLabel: app.kubernetes.io/name
+  podTargetLabels:
+    - app.kubernetes.io/version
+    - rollouts-pod-template-hash
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: hello
+  podMetricsEndpoints:
+    - port: metrics
+      interval: 15s

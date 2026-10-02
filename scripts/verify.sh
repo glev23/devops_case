@@ -336,6 +336,21 @@ else
   ok "GitOps выключен (gitops_enabled: false) — манифесты применены из локальной копии"
 fi
 
+section "Прогрессивная доставка (Argo Rollouts)"
+ro_phase=$(kubectl -n demo get rollout hello -o jsonpath='{.status.phase}' 2>/dev/null || true)
+ro_ver=$(kubectl -n demo get rollout hello -o jsonpath='{.spec.template.metadata.labels.app\.kubernetes\.io/version}' 2>/dev/null || true)
+if [[ $ro_phase == Healthy ]]; then
+  ok "Rollout demo/hello: Healthy, версия ${ro_ver:-?} (canary 10→30→60→100%, анализ 5xx)"
+else
+  fail "Rollout demo/hello: ${ro_phase:-не найден}"
+fi
+canary_ref=$(kubectl -n demo get httproute hello -o jsonpath='{.spec.rules[2].backendRefs[*].name}' 2>/dev/null || true)
+if [[ $canary_ref == *hello-canary* ]] && kubectl -n demo get analysistemplate gateway-error-rate >/dev/null 2>&1; then
+  ok "HTTPRoute правило / → hello + hello-canary (веса ведёт Rollouts); AnalysisTemplate gateway-error-rate на месте"
+else
+  fail "нет canary-backend в HTTPRoute или AnalysisTemplate gateway-error-rate"
+fi
+
 section "Безопасность: NetworkPolicy, PDB"
 # Под из чужого namespace (default) не должен достучаться до приложения напрямую
 np_out=$(in_cluster "curl -s -m 4 -o /dev/null -w '%{http_code}' http://hello.demo/ || echo blocked" default)

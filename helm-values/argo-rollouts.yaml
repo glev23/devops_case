@@ -1,0 +1,32 @@
+# Argo Rollouts — прогрессивная доставка (ROLLOUT-001): canary-релиз через
+# веса backendRefs в HTTPRoute (плагин Gateway API) с анализом метрик в Prometheus.
+controller:
+  # Один узел — одна реплика контроллера (по умолчанию в чарте 2)
+  replicas: 1
+  # Плагин Gateway API: контроллер скачивает бинарник при старте и проверяет
+  # его контрольную сумму (вычислена для v0.17.0 linux-amd64)
+  trafficRouterPlugins:
+    - name: argoproj-labs/gatewayAPI
+      location: https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/releases/download/v0.17.0/gatewayapi-plugin-linux-amd64
+      sha256: 1904ca787d33107c140521899d61fff030ee75d99908bd175fca5a4647759061
+  resources:
+    requests:
+      cpu: 20m
+      memory: 64Mi
+    limits:
+      memory: 256Mi
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+
+# Права плагину на HTTPRoute и другие маршруты Gateway API
+providerRBAC:
+  enabled: true
+  providers:
+    gatewayAPI: true
+
+# Веб-интерфейс Rollouts без аутентификации умеет promote/abort — не ставим;
+# ход релиза виден в kubectl argo rollouts, Argo CD и на дашборде Grafana
+dashboard:
+  enabled: false

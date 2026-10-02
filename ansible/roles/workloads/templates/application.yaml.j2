@@ -19,10 +19,16 @@ spec:
   syncPolicy:
     automated:
       prune: true
-      selfHeal: true
+      selfHeal: {{ item.self_heal | default(true) | bool | lower }}
+    syncOptions:
+      - RespectIgnoreDifferences=true
     retry:
       limit: 5
       backoff:
         duration: 10s
         factor: 2
         maxDuration: 2m
+{% if item.ignore_differences is defined %}
+  ignoreDifferences:
+    {{ item.ignore_differences | to_nice_yaml(indent=2) | indent(4) }}
+{% endif %}

@@ -1,0 +1,24 @@
+---
+# Argo Rollouts: контроллер с плагином Gateway API и CLI kubectl argo rollouts.
+
+- name: Install Argo Rollouts
+  kubernetes.core.helm:
+    kubeconfig: "{{ kubeconfig }}"
+    release_name: argo-rollouts
+    release_namespace: argo-rollouts
+    create_namespace: true
+    chart_repo_url: https://argoproj.github.io/argo-helm
+    chart_ref: argo-rollouts
+    chart_version: "{{ argo_rollouts_chart_version }}"
+    values_files:
+      - "{{ repo_root }}/helm-values/argo-rollouts.yaml"
+    wait: true
+    wait_timeout: 10m
+
+# CLI для наблюдения за релизом: kubectl argo rollouts get rollout hello -n demo --watch
+- name: Install kubectl argo rollouts plugin
+  ansible.builtin.get_url:
+    url: "https://github.com/argoproj/argo-rollouts/releases/download/{{ argo_rollouts_version }}/kubectl-argo-rollouts-linux-amd64"
+    dest: /usr/local/bin/kubectl-argo-rollouts
+    checksum: "sha256:{{ argo_rollouts_cli_sha256 }}"
+    mode: "0755"

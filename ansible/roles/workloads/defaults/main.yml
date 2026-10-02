@@ -14,3 +14,14 @@ workloads_items:
   - name: demo
     path: deploy/app
     namespace: demo
+    # Демонстрационные релизы (scripts/release.sh) запускаются командой, а не
+    # коммитом: self-heal откатил бы их за секунды. Синхронизация по новым
+    # коммитам остаётся (automated sync), ручные изменения видны как OutOfSync.
+    self_heal: false
+    # Веса stable/canary в правиле "/" ведёт Argo Rollouts во время релиза
+    ignore_differences:
+      - group: gateway.networking.k8s.io
+        kind: HTTPRoute
+        name: hello
+        jqPathExpressions:
+          - .spec.rules[2].backendRefs[].weight

@@ -2,6 +2,8 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: hello
+  labels:
+    app.kubernetes.io/name: hello
 spec:
   replicas: 2
   selector:
@@ -11,6 +13,9 @@ spec:
     metadata:
       labels:
         app.kubernetes.io/name: hello
+        # Версия попадает в метрики (podTargetLabels PodMonitor) — на дашборде
+        # видно, как трафик переходит со стабильной версии на canary
+        app.kubernetes.io/version: v1
     spec:
       automountServiceAccountToken: false
       securityContext:

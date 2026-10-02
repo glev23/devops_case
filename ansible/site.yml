@@ -17,6 +17,7 @@
     - gateway
     - monitoring
     - logging
+    - rollouts
     - role: gitops
       when: gitops_enabled | bool
 

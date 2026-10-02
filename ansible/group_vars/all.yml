@@ -41,6 +41,11 @@ gitops_repo_url: https://github.com/glev23/devops_case.git
 gitops_revision: main
 argocd_chart_version: "10.9.6"   # Argo CD v3.5.3
 
+# Прогрессивная доставка (ROLLOUT-001): Argo Rollouts + плагин Gateway API v0.17.0
+argo_rollouts_chart_version: "2.43.2"
+argo_rollouts_version: "v1.10.0"
+argo_rollouts_cli_sha256: 57a464e80c3e716076c9760e1d15ff06b853e3bcab3e22e30f4dba8a3e9f29b2
+
 # Helm (ветка 3: модули kubernetes.core рассчитаны на Helm 3)
 helm_version: "v3.22.0"
 

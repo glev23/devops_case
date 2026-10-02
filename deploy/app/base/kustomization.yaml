@@ -5,7 +5,7 @@ kind: Kustomization
 resources:
   - deployment.yaml
   - service.yaml
-  - servicemonitor.yaml
+  - podmonitor.yaml
 
 # Хэш в имени ConfigMap: изменение nginx.conf само перезапускает поды
 configMapGenerator:
