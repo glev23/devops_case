@@ -107,6 +107,10 @@ jobs:
       - name: Verify
         run: ./scripts/verify.sh
 
+      # Экскурсия для эксперта должна проходить без ошибок (релизы — отдельными шагами ниже)
+      - name: Demo walkthrough (make demo)
+        run: make demo DEMO_ARGS="--auto --no-release"
+
       # Прогрессивная доставка (ROLLOUT-001): анализ метрик решает судьбу релиза
       - name: Canary release — bad version is rolled back automatically
         run: ./scripts/release.sh bad && ./scripts/release.sh reset
