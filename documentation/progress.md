@@ -34,7 +34,7 @@ canary с откатом, трейсинг, `make demo`), проверка с н
 | Политики трафика Gateway: таймауты, ретраи на сетевые сбои, circuit breaker, rate limit → 429, защита заголовков | ✅ | GW-003 |
 | Практики безопасности: basic auth на Prometheus, NetworkPolicy, PDB, сводка мер | ✅ | SEC-001 |
 | SLO 99,9%, бюджет ошибок, multiwindow burn-rate алерты, дашборд SLO | ✅ | SLO-001 |
-| GitOps-CD: Argo CD синхронизирует кластер с GitHub | ⬜ | CD-001 |
+| GitOps-CD: Argo CD синхронизирует кластер с GitHub (push → кластер ~1 мин, self-heal), UI через Gateway | ✅ | CD-001 |
 | Автоматический canary-релиз с анализом метрик и откатом (Argo Rollouts + Gateway API) | ⬜ | ROLLOUT-001 |
 | Трейсинг: Envoy → Tempo, переходы лог ↔ трейс | ⬜ | TRACE-001 |
 | `make demo` — сценарий-экскурсия для эксперта и жюри | ⬜ | DEMO-001 |
