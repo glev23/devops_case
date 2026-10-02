@@ -3,18 +3,39 @@
 controller:
   # Один узел — одна реплика контроллера (по умолчанию в чарте 2)
   replicas: 1
-  # Плагин Gateway API: контроллер скачивает бинарник при старте и проверяет
-  # его контрольную сумму (вычислена для v0.17.0 linux-amd64)
+  # Плагин Gateway API берётся из образа (init-контейнер копирует бинарник в
+  # emptyDir), а не скачивается с GitHub при каждом старте контроллера: при
+  # медленной сети загрузка 78 МБ не успевала до liveness-пробы, и контроллер
+  # уходил в CrashLoopBackOff. Образ закреплён по digest и кэшируется containerd.
+  initContainers:
+    - name: copy-gatewayapi-plugin
+      image: ghcr.io/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi:v0.17.0@sha256:bc40d5edf13307e455f6c18cbf9cc79715165cbee8b05a674fd88119f119d4a2
+      command: ["/bin/sh", "-c"]
+      args:
+        - cp /bin/rollouts-plugin-trafficrouter-gatewayapi /plugins/
+      volumeMounts:
+        - name: gatewayapi-plugin
+          mountPath: /plugins
+      securityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop: [ALL]
+  volumes:
+    - name: gatewayapi-plugin
+      emptyDir:
+        sizeLimit: 128Mi
+  volumeMounts:
+    - name: gatewayapi-plugin
+      mountPath: /plugins
   trafficRouterPlugins:
     - name: argoproj-labs/gatewayAPI
-      location: https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/releases/download/v0.17.0/gatewayapi-plugin-linux-amd64
-      sha256: 1904ca787d33107c140521899d61fff030ee75d99908bd175fca5a4647759061
+      location: file:///plugins/rollouts-plugin-trafficrouter-gatewayapi
   resources:
     requests:
       cpu: 20m
       memory: 64Mi
     limits:
-      memory: 256Mi
+      memory: 512Mi
   metrics:
     enabled: true
     serviceMonitor:

@@ -58,7 +58,8 @@ spec:
               cpu: 5m
               memory: 8Mi
             limits:
-              cpu: 100m
+              # цикл curl с короткими паузами упирался в 100m (CPUThrottlingHigh)
+              cpu: 300m
               memory: 32Mi
           securityContext:
             allowPrivilegeEscalation: false
