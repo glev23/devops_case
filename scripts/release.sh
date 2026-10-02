@@ -12,6 +12,8 @@
 # Код выхода 0 — релиз закончился ожидаемо (good → Healthy, bad → откат).
 set -euo pipefail
 
+cd "$(dirname "$0")/.."
+
 NS=demo
 ROLLOUT=hello
 TIMEOUT=${RELEASE_TIMEOUT:-600}
@@ -22,17 +24,6 @@ say() { printf '%s\n' "$*"; }
 cmd() { printf '%s$ %s%s\n' "$c_dim" "$*" "$c_0"; }
 
 rollout_jsonpath() { kubectl -n "$NS" get rollout "$ROLLOUT" -o jsonpath="$1"; }
-
-# ConfigMap из Git (сгенерирован Kustomize) запоминается при первом релизе
-base_config() {
-  local base
-  base=$(rollout_jsonpath '{.metadata.annotations.devops-case/base-config}')
-  if [[ -z $base ]]; then
-    base=$(rollout_jsonpath '{.spec.template.spec.volumes[0].configMap.name}')
-    kubectl -n "$NS" annotate rollout "$ROLLOUT" "devops-case/base-config=$base" >/dev/null
-  fi
-  printf '%s' "$base"
-}
 
 grafana_annotation() {
   local text=$1 tag=$2 pw
@@ -116,10 +107,10 @@ watch_release() {
 }
 
 release() {
-  local base new_conf
+  local new_conf
   VERSION=$1
-  base=$(base_config)
-  new_conf=$(kubectl -n "$NS" get configmap "$base" -o jsonpath='{.data.nginx\.conf}')
+  # Конфиг новой версии строится из nginx.conf в репозитории (версия из Git)
+  new_conf=$(cat deploy/app/base/nginx.conf)
   # $hostname — переменная nginx, а не shell: строки берутся буквально
   # shellcheck disable=SC2016
   local stable_line='return 200 "Hello World! from $hostname\n";'
@@ -153,19 +144,28 @@ release() {
 }
 
 reset() {
-  local base
-  base=$(base_config)
-  say "${c_b}Возврат к версии из Git (v1, ConfigMap $base)${c_0}"
-  kubectl -n "$NS" patch rollout "$ROLLOUT" --type=json -p "[
-    {\"op\":\"replace\",\"path\":\"/spec/template/spec/volumes/0/configMap/name\",\"value\":\"$base\"},
-    {\"op\":\"replace\",\"path\":\"/spec/template/metadata/labels/app.kubernetes.io~1version\",\"value\":\"v1\"}
-  ]" >/dev/null
+  local rev
+  say "${c_b}Возврат к версии из Git${c_0}"
+  if kubectl -n argocd get application demo >/dev/null 2>&1; then
+    # GitOps: Argo CD синхронизирует приложение с текущим коммитом
+    rev=$(kubectl -n argocd get application demo -o jsonpath='{.status.sync.revision}')
+    cmd "Argo CD: sync application demo → ${rev:0:7}"
+    kubectl -n argocd patch application demo --type merge \
+      -p "{\"operation\":{\"initiatedBy\":{\"username\":\"release.sh\"},\"sync\":{\"revision\":\"$rev\"}}}" >/dev/null
+    for _ in $(seq 60); do
+      [[ $(kubectl -n argocd get application demo -o jsonpath='{.status.sync.status}') == Synced ]] && break
+      sleep 2
+    done
+  else
+    cmd "kubectl apply -k deploy/app"
+    kubectl apply -k deploy/app >/dev/null
+  fi
   # После отката — снять признак abort; после успешного релиза — без шагов canary
   kubectl argo rollouts retry rollout "$ROLLOUT" -n "$NS" >/dev/null 2>&1 || true
   kubectl argo rollouts promote "$ROLLOUT" -n "$NS" --full >/dev/null 2>&1 || true
   kubectl argo rollouts status "$ROLLOUT" -n "$NS" --timeout 300s >/dev/null
   kubectl -n "$NS" delete configmap -l devops-case/release-config=true --ignore-not-found >/dev/null
-  grafana_annotation "Возврат к версии из Git (v1)" reset
+  grafana_annotation "Возврат к версии из Git" reset
   say "${c_ok}✔ Версия из Git восстановлена, Rollout Healthy.${c_0}"
 }
 

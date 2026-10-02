@@ -79,6 +79,8 @@
       - ca-certificates
       - curl
       - gpg
+      # make — для команд make verify / make demo / make release-* после установки
+      - make
       - containerd
       - python3-kubernetes
     state: present
