@@ -30,13 +30,13 @@ workloads_items:
         jqPathExpressions:
           - .spec.rules[2].backendRefs[].weight
       # хэш шаблона пода, который Rollouts добавляет в селекторы
-      - group: ""
-        kind: Service
+      # (group для core-ресурсов не указывается: пустое значение Argo CD не
+      # сохраняет, и сравнение spec давало бы ложное изменение)
+      - kind: Service
         name: hello
         jsonPointers:
           - /spec/selector
-      - group: ""
-        kind: Service
+      - kind: Service
         name: hello-canary
         jsonPointers:
           - /spec/selector
