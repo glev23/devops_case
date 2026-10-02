@@ -155,6 +155,7 @@ Prometheus (< 2%), при провале — автоматический отк
 | Алерты (MON-002) | `PrometheusRule devops-case`: приложение (targets, реплики), Gateway (5xx > 10%, p95 > 500 мс, прокси), Fluentd, Loki; recording rules по маршрутам |
 | Дашборд (MON-002) | «DevOps case / Gateway и приложение» — JSON в `deploy/monitoring/dashboards/`, ConfigMap с `grafana_dashboard: "1"` |
 | Фоновая нагрузка | `demo/loadgen`: ~4 запроса/с через Gateway, графики живые сразу после установки |
+| Трейсинг (TRACE-001) | Envoy Gateway → OTLP → Grafana Tempo 3.1 (`tracing/tempo`), sampling 100%; `traceparent` в логе nginx; в Grafana лог ↔ трейс (derived field Loki, `tracesToLogsV2` Tempo) |
 | SLO (SLO-001) | SLI — доля не-5xx по правилам `/canary`, `/v2`, `/` (Envoy); SLO 99,9%, бюджет 0,1% за 3 дня; burn-rate алерты 14,4× (1 ч + 5 мин) и 6× (6 ч + 30 мин); дашборд «SLO доступности» |
 | Хранение | emptyDir, retention 3 дня / 4 ГБ: в кластере нет StorageClass |
 | Grafana | пароль admin случайный, создаётся один раз в Secret `monitoring/grafana-admin`; пароль чарта по умолчанию не работает |
@@ -292,6 +293,8 @@ pull-модели (CD-001) — кластер сам забирает измен
   github.com, get.helm.sh; офлайн-установка не поддерживается.
 - Пул IP подов Calico задаётся при первой установке; смена `pod_cidr` на
   существующем кластере не поддерживается, нужна переустановка.
+- Трейсы Tempo — на emptyDir, хранение 48 ч; sampling 100% подходит для
+  демонстрационной нагрузки, для продакшена нужна выборка.
 - Окно бюджета ошибок SLO — 3 дня (retention Prometheus), а не классические
   30 дней: для 30 дней нужно постоянное хранилище.
 - Метрики Prometheus и логи Loki хранятся в emptyDir: при пересоздании пода

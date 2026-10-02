@@ -89,7 +89,9 @@ ROLLOUT-001, TRACE-001, DEMO-001 — см. очередь и «План по д�
 
 **ROLLOUT-001 закрыта** (02.10.2026) — [rollout-001.md](./tasks/rollout-001.md): canary через Gateway API, автооткат плохой версии за ~40 с, хорошая — до 100% за 2 мин 20 с; оба сценария — шаги CI.
 
-**Дальше:** TRACE-001, DEMO-001.
+**TRACE-001 закрыта** (02.10.2026) — [trace-001.md](./tasks/trace-001.md): трейсы Envoy → Tempo, лог ↔ трейс; e2e 12 мин 50 с. Взята на день раньше плана.
+
+**Дальше:** DEMO-001.
 
 ## Очередь выполнения
 
@@ -129,8 +131,8 @@ ROLLOUT-001, TRACE-001, DEMO-001 — см. очередь и «План по д�
 | 130 | [SLO-001](./tasks/slo-001.md) | `done` | GW-003, MON-002 | SLI доступности, SLO 99,9%, бюджет ошибок, burn-rate алерты, дашборд SLO |
 | 140 | [CD-001](./tasks/cd-001.md) | `done` | SEC-001 | Argo CD: кластер синхронизируется с GitHub (pull-модель), UI через Gateway, в CI — по SHA коммита |
 | 150 | [ROLLOUT-001](./tasks/rollout-001.md) | `done` | CD-001, SLO-001, GW-003 | Argo Rollouts + Gateway API: canary 10→30→60→100%, анализ 5xx в Prometheus, автооткат плохого релиза |
-| 160 | [TRACE-001](./tasks/trace-001.md) | `ready` | GW-002, LOG-001, GRAF-001 | Трейсы Envoy → Tempo, переходы лог ↔ трейс в Grafana |
-| 170 | [DEMO-001](./tasks/demo-001.md) | `planned` | ROLLOUT-001, TRACE-001 | `make demo`: сценарий-экскурсия по решению (интерактивно и `--auto`) |
+| 160 | [TRACE-001](./tasks/trace-001.md) | `done` | GW-002, LOG-001, GRAF-001 | Трейсы Envoy → Tempo, переходы лог ↔ трейс в Grafana |
+| 170 | [DEMO-001](./tasks/demo-001.md) | `ready` | ROLLOUT-001, TRACE-001 | `make demo`: сценарий-экскурсия по решению (интерактивно и `--auto`) |
 
 ### Финализация и сдача
 

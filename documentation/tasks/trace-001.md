@@ -3,7 +3,7 @@
 | Поле | Значение |
 |---|---|
 | ID | `TRACE-001` |
-| Статус | `ready` |
+| Статус | `done` |
 | Требования | кейс — «Расширенные мониторинг и логирование»; критерий 3 («качество подхода к observability»); architecture.md §6, §7 |
 | Решения | D-11 |
 | Зависимости | GW-002, LOG-001, GRAF-001 |
@@ -43,7 +43,7 @@
 
 | Компонент | Версия |
 |---|---|
-| Tempo | чарт `grafana/tempo` 1.24.4 (Tempo 2.9.0) ⚠️ последний релиз Tempo — v3.1.0, чарт отстаёт; сверить актуальный способ установки single binary |
+| Tempo | 3.1.0, чарт `grafana-community/tempo` 3.1.0 (single binary). Чарт `grafana/tempo` помечен deprecated и перенесён в grafana-community |
 
 - Ресурсы: ~0,2–0,3 ГБ RAM.
 - Идентификатор: `traceparent` (W3C) пробрасывается Envoy до nginx.
@@ -60,11 +60,44 @@
 
 ## Критерии приёмки
 
-- [ ] Запрос через Gateway → трейс в Tempo (поиск по trace id через API).
-- [ ] В Grafana: строка лога nginx → кнопка перехода в трейс → трейс
+- [x] Запрос через Gateway → трейс в Tempo (поиск по trace id через API).
+- [x] В Grafana: строка лога nginx → кнопка перехода в трейс → трейс
       открывается; из трейса — переход к логам.
-- [ ] Повторный `deploy.sh` → `changed=0`; CI `e2e` зелёный.
+- [x] Повторный `deploy.sh` → `changed=0`; CI `e2e` зелёный.
 
 ## Результат закрытия
 
-Заполняется после выполнения.
+Закрыта 02.10.2026.
+
+**Как сделано:**
+- Tempo 3.1 (single binary): только приёмник OTLP (gRPC :4317, HTTP :4318),
+  данные на emptyDir 2 ГиБ (без PVC чарт ничего не монтирует в `/var/tempo`),
+  read-only rootfs, `drop: [ALL]`, хранение 48 ч, ServiceMonitor.
+- `EnvoyProxy.spec.telemetry.tracing`: провайдер OpenTelemetry → `tempo.tracing:4317`,
+  `samplingRate: 100`, тег `k8s.cluster: devops-case`. Envoy продолжает
+  входящий `traceparent` или создаёт трейс сам и передаёт заголовок в backend.
+- nginx пишет `traceparent` в JSON access-лог.
+- Grafana: datasource Tempo (`tracesToLogsV2` → Loki по trace ID, node
+  graph), в datasource Loki — derived field `TraceID` по полю `traceparent`
+  (кнопка «Трейс в Tempo» у строки лога).
+
+**Артефакты:** `helm-values/tempo.yaml`, роль `ansible/roles/tracing`,
+`deploy/gateway/envoyproxy.yaml` (telemetry), `deploy/app/base/nginx.conf`
+(traceparent), `helm-values/kube-prometheus-stack.yaml` (datasources),
+раздел «Трейсинг» в `scripts/verify.sh`.
+
+| Проверка | Результат |
+|---|---|
+| Запрос с известным trace ID через Gateway | трейс найден в Tempo (`/api/v2/traces/<id>` → 200), строка с этим ID — в Loki |
+| Обычный запрос без `traceparent` | Envoy создал трейс; в логе nginx `traceparent` `00-d634…-01`; в Tempo спаны `ingress` и `router httproute/demo/hello/rule/1 egress` (код 200, 0,48 мс, тег `k8s.cluster`) |
+| Grafana | datasource `tempo` — OK |
+| Prometheus | target `tempo` — UP |
+| GitOps-релиз | изменение `nginx.conf` в коммите → Argo CD применил через ~50 с → Rollouts сам провёл canary 10→30→60→100% с анализом за 2 мин 15 с |
+| Повтор `deploy.sh` | `changed=0` |
+| GitHub Actions | [run 37008951094](https://github.com/glev23/devops_case/actions/runs/37008951094): все шаги e2e (включая оба сценария релиза) — зелёные; e2e 12 мин 50 с |
+
+**Отклонения от постановки:**
+- Вместо устаревшего чарта `grafana/tempo` (Tempo 2.9) — актуальный
+  `grafana-community/tempo` с Tempo 3.1.
+- OpenTelemetry Collector не ставился (как и планировалось): Envoy отправляет
+  спаны напрямую.
