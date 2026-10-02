@@ -1,0 +1,28 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ item.name }}
+  namespace: argocd
+  annotations:
+    # Сравнение через серверный dry-run: значения по умолчанию, которые
+    # дописывает API-сервер, не дают ложного OutOfSync
+    argocd.argoproj.io/compare-options: ServerSideDiff=true
+spec:
+  project: default
+  source:
+    repoURL: {{ gitops_repo_url }}
+    targetRevision: {{ gitops_revision }}
+    path: {{ item.path }}
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: {{ item.namespace }}
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 2m

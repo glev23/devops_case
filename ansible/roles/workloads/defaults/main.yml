@@ -1,0 +1,16 @@
+---
+# Каталоги deploy/*, которые доставляются в кластер, — в порядке зависимостей:
+# Gateway и TLS → маршруты/мониторы/алерты → сборщик логов → приложение.
+workloads_items:
+  - name: gateway
+    path: deploy/gateway
+    namespace: gateway
+  - name: monitoring
+    path: deploy/monitoring
+    namespace: monitoring
+  - name: logging
+    path: deploy/logging
+    namespace: logging
+  - name: demo
+    path: deploy/app
+    namespace: demo

@@ -8,6 +8,7 @@
     - cni
     - helm
 
+# Платформа: Helm-чарты, секреты и CRD, на которые опираются манифесты deploy/*
 - name: Platform
   hosts: k8s
   become: true
@@ -16,9 +17,12 @@
     - gateway
     - monitoring
     - logging
+    - role: gitops
+      when: gitops_enabled | bool
 
+# Манифесты deploy/*: через Argo CD из Git или kubectl из локальной копии
 - name: Workloads
   hosts: k8s
   become: true
   roles:
-    - app
+    - workloads

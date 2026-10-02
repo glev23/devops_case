@@ -1,5 +1,5 @@
 ---
-# Loki (хранилище логов) + Fluentd (сборщик) из deploy/logging.
+# Loki (хранилище логов). Fluentd (deploy/logging) доставляет роль workloads.
 
 - name: Install Loki
   kubernetes.core.helm:
@@ -14,15 +14,3 @@
       - "{{ repo_root }}/helm-values/loki.yaml"
     wait: true
     wait_timeout: 10m
-
-- name: Apply Fluentd
-  ansible.builtin.include_role:
-    name: kustomize
-  vars:
-    kustomize_dir: deploy/logging
-
-- name: Wait for Fluentd rollout
-  ansible.builtin.command: kubectl -n logging rollout status daemonset/fluentd --timeout=300s
-  environment:
-    KUBECONFIG: "{{ kubeconfig }}"
-  changed_when: false

@@ -1,5 +1,5 @@
 ---
-# Envoy Gateway (реализация Gateway API) + GatewayClass/Gateway из deploy/gateway.
+# Envoy Gateway (реализация Gateway API). Ресурсы deploy/gateway доставляет роль workloads.
 
 - name: Install Envoy Gateway
   kubernetes.core.helm:
@@ -11,25 +11,3 @@
     chart_version: "{{ envoy_gateway_version }}"
     wait: true
     wait_timeout: 10m
-
-- name: Apply GatewayClass, EnvoyProxy and Gateway
-  ansible.builtin.include_role:
-    name: kustomize
-  vars:
-    kustomize_dir: deploy/gateway
-
-- name: Wait for TLS certificate
-  ansible.builtin.command: >
-    kubectl -n gateway wait certificate/devops-test-tls
-    --for=condition=Ready --timeout=300s
-  environment:
-    KUBECONFIG: "{{ kubeconfig }}"
-  changed_when: false
-
-- name: Wait for Gateway to be programmed
-  ansible.builtin.command: >
-    kubectl -n gateway wait gateway/main
-    --for=condition=Programmed --timeout=300s
-  environment:
-    KUBECONFIG: "{{ kubeconfig }}"
-  changed_when: false

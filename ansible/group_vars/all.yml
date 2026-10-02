@@ -33,6 +33,14 @@ kube_prometheus_stack_version: "91.8.2"
 # Логирование: Loki 3.6 (чарт grafana/loki), Fluentd — образ в deploy/logging
 loki_chart_version: "7.3.0"
 
+# GitOps (CD-001): Argo CD синхронизирует deploy/* с Git.
+# gitops_enabled: false — манифесты применяются из локальной копии (kubectl),
+# например без доступа к GitHub. В CI gitops_revision = SHA проверяемого коммита.
+gitops_enabled: true
+gitops_repo_url: https://github.com/glev23/devops_case.git
+gitops_revision: main
+argocd_chart_version: "10.9.6"   # Argo CD v3.5.3
+
 # Helm (ветка 3: модули kubernetes.core рассчитаны на Helm 3)
 helm_version: "v3.22.0"
 

@@ -78,6 +78,11 @@ jobs:
     needs: [lint, secrets]
     runs-on: ubuntu-24.04
     timeout-minutes: 60
+    env:
+      # Argo CD в кластере раннера синхронизируется ровно с проверяемым коммитом,
+      # а не с main (для pull request — head-коммит из репозитория автора)
+      GITOPS_REVISION: ${{ github.event.pull_request.head.sha || github.sha }}
+      GITOPS_REPO_URL: ${{ github.event.pull_request.head.repo.clone_url || format('{0}/{1}.git', github.server_url, github.repository) }}
     steps:
       - uses: actions/checkout@v7
 
@@ -85,11 +90,11 @@ jobs:
         run: sudo ./ci/prepare-runner.sh
 
       - name: Deploy (first run)
-        run: sudo ./deploy.sh | tee deploy-1.log
+        run: sudo ./deploy.sh -e gitops_revision="$GITOPS_REVISION" -e gitops_repo_url="$GITOPS_REPO_URL" | tee deploy-1.log
 
       - name: Deploy again — must change nothing (idempotency)
         run: |
-          sudo ./deploy.sh | tee deploy-2.log
+          sudo ./deploy.sh -e gitops_revision="$GITOPS_REVISION" -e gitops_repo_url="$GITOPS_REPO_URL" | tee deploy-2.log
           recap=$(grep -A1 'PLAY RECAP' deploy-2.log | grep -Eo 'changed=[0-9]+' | sort -u)
           echo "Recap: $recap"
           if [ "$recap" != "changed=0" ]; then
@@ -108,6 +113,7 @@ jobs:
           sudo cp deploy-*.log diag/ 2>/dev/null || true
           kubectl get pods -A -o wide > diag/pods.txt 2>&1 || true
           kubectl get events -A --sort-by=.lastTimestamp > diag/events.txt 2>&1 || true
+          kubectl -n argocd get applications -o yaml > diag/argocd-applications.yaml 2>&1 || true
           kubectl describe pods -A > diag/describe-pods.txt 2>&1 || true
           sudo journalctl -u kubelet --no-pager -n 500 > diag/kubelet.txt 2>&1 || true
           sudo journalctl -u containerd --no-pager -n 300 > diag/containerd.txt 2>&1 || true

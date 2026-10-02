@@ -315,6 +315,27 @@ for ds in prometheus loki; do
   fi
 done
 
+section "GitOps (Argo CD)"
+if kubectl get namespace argocd >/dev/null 2>&1; then
+  apps=$(kubectl -n argocd get applications.argoproj.io \
+    -o jsonpath='{range .items[*]}{.metadata.name} {.status.sync.status} {.status.health.status} {.status.sync.revision}{"\n"}{end}')
+  bad=$(awk '$2 != "Synced" || $3 != "Healthy" {print $1 "=" $2 "/" $3}' <<< "$apps")
+  if [[ -n $apps && -z $bad ]]; then
+    revs=$(awk '{print substr($4, 1, 7)}' <<< "$apps" | sort -u | tr '\n' ' ')
+    ok "Application Synced/Healthy: $(awk '{print $1}' <<< "$apps" | tr '\n' ' ')— из Git, коммит $revs"
+  else
+    fail "Application не синхронизированы: ${bad:-нет Application}"
+  fi
+  argocd_health=$(gw_host argocd.devops.test /healthz || true)
+  if [[ $argocd_health == ok ]]; then
+    ok "Host: argocd.devops.test → UI Argo CD (/healthz: ok)"
+  else
+    fail "UI Argo CD через Gateway не отвечает: ${argocd_health:-<нет ответа>}"
+  fi
+else
+  ok "GitOps выключен (gitops_enabled: false) — манифесты применены из локальной копии"
+fi
+
 section "Безопасность: NetworkPolicy, PDB"
 # Под из чужого namespace (default) не должен достучаться до приложения напрямую
 np_out=$(in_cluster "curl -s -m 4 -o /dev/null -w '%{http_code}' http://hello.demo/ || echo blocked" default)

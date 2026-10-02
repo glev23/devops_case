@@ -7,6 +7,10 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: loadgen
+  annotations:
+    # Доставляется Argo CD из Git (CD-001); изменение манифеста в main
+    # появляется в кластере без запуска deploy.sh
+    devops-case/delivery: gitops
 spec:
   replicas: 1
   selector:

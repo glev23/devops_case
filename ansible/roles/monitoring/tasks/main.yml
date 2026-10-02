@@ -96,9 +96,3 @@
       - "{{ repo_root }}/helm-values/kube-prometheus-stack.yaml"
     wait: true
     wait_timeout: 15m
-
-- name: Apply routes, Envoy monitors, alerts and dashboard
-  ansible.builtin.include_role:
-    name: kustomize
-  vars:
-    kustomize_dir: deploy/monitoring

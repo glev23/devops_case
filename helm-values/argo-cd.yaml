@@ -1,0 +1,74 @@
+# Argo CD — GitOps-доставка: кластер сам забирает манифесты deploy/* из
+# GitHub (pull-модель, без входящих подключений к стенду).
+# Минимальная установка на один узел: без Dex (SSO) и уведомлений.
+# UI — через Gateway: http(s)://argocd.devops.test:30080 (HTTPRoute в deploy/argocd).
+# Пароль admin генерирует сам Argo CD (Secret argocd-initial-admin-secret).
+
+configs:
+  params:
+    # TLS терминирует Envoy Gateway, сам сервер отдаёт HTTP
+    server.insecure: true
+  cm:
+    # Опрос Git раз в ~1 мин (по умолчанию 3 мин): изменения после push видны быстрее
+    timeout.reconciliation: 60s
+    timeout.reconciliation.jitter: 10s
+    # Отслеживание ресурсов по аннотации (не трогает метки app.kubernetes.io/instance)
+    application.resourceTrackingMethod: annotation
+
+dex:
+  enabled: false
+
+notifications:
+  enabled: false
+
+controller:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 256Mi
+    limits:
+      memory: 1Gi
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+
+server:
+  resources:
+    requests:
+      cpu: 20m
+      memory: 64Mi
+    limits:
+      memory: 256Mi
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+
+repoServer:
+  resources:
+    requests:
+      cpu: 20m
+      memory: 64Mi
+    limits:
+      memory: 512Mi
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+
+applicationSet:
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      memory: 128Mi
+
+redis:
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      memory: 128Mi

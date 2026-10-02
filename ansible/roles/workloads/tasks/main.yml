@@ -1,0 +1,50 @@
+---
+# Доставка каталогов deploy/* в кластер.
+# gitops_enabled: true  — Argo CD Application на каждый каталог (источник — Git);
+# gitops_enabled: false — kubectl diff/apply из локальной копии репозитория.
+
+- name: Deliver workloads via Argo CD (GitOps)
+  ansible.builtin.include_tasks: application.yml
+  loop: "{{ workloads_items }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when: gitops_enabled | bool
+
+- name: Apply workloads from local checkout
+  ansible.builtin.include_role:
+    name: kustomize
+  vars:
+    kustomize_dir: "{{ item.path }}"
+  loop: "{{ workloads_items }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when: not (gitops_enabled | bool)
+
+- name: Wait for TLS certificate
+  ansible.builtin.command: >
+    kubectl -n gateway wait certificate/devops-test-tls
+    --for=condition=Ready --timeout=300s
+  environment:
+    KUBECONFIG: "{{ kubeconfig }}"
+  changed_when: false
+
+- name: Wait for Gateway to be programmed
+  ansible.builtin.command: >
+    kubectl -n gateway wait gateway/main
+    --for=condition=Programmed --timeout=300s
+  environment:
+    KUBECONFIG: "{{ kubeconfig }}"
+  changed_when: false
+
+- name: Wait for Fluentd rollout
+  ansible.builtin.command: kubectl -n logging rollout status daemonset/fluentd --timeout=300s
+  environment:
+    KUBECONFIG: "{{ kubeconfig }}"
+  changed_when: false
+
+- name: Wait for demo application rollout
+  ansible.builtin.command: kubectl -n demo rollout status deployment/{{ item }} --timeout=300s
+  environment:
+    KUBECONFIG: "{{ kubeconfig }}"
+  changed_when: false
+  loop: [hello, hello-v2, loadgen]

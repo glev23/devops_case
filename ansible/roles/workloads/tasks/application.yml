@@ -1,0 +1,24 @@
+---
+# Одно приложение Argo CD: создать Application и дождаться синхронизации с Git.
+
+- name: Create Argo CD Application {{ item.name }}
+  kubernetes.core.k8s:
+    kubeconfig: "{{ kubeconfig }}"
+    state: present
+    definition: "{{ lookup('ansible.builtin.template', 'application.yaml.j2') | from_yaml }}"
+
+- name: Wait for Git sync of Application {{ item.name }}
+  ansible.builtin.command: >
+    kubectl -n argocd wait application/{{ item.name }}
+    --for=jsonpath='{.status.sync.status}'=Synced --timeout=600s
+  environment:
+    KUBECONFIG: "{{ kubeconfig }}"
+  changed_when: false
+
+- name: Wait for health of Application {{ item.name }}
+  ansible.builtin.command: >
+    kubectl -n argocd wait application/{{ item.name }}
+    --for=jsonpath='{.status.health.status}'=Healthy --timeout=600s
+  environment:
+    KUBECONFIG: "{{ kubeconfig }}"
+  changed_when: false

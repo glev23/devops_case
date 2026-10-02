@@ -1,0 +1,25 @@
+# UI и API Argo CD через Gateway: http(s)://argocd.devops.test:30080 / :30443
+# Значения по умолчанию (group, kind, weight) указаны явно — идемпотентность apply.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: argocd
+spec:
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: main
+      namespace: gateway
+  hostnames:
+    - argocd.devops.test
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - group: ""
+          kind: Service
+          name: argocd-server
+          port: 80
+          weight: 1
