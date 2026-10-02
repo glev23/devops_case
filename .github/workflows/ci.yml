@@ -94,7 +94,8 @@ jobs:
 
       - name: Deploy again — must change nothing (idempotency)
         run: |
-          sudo ./deploy.sh -e gitops_revision="$GITOPS_REVISION" -e gitops_repo_url="$GITOPS_REPO_URL" | tee deploy-2.log
+          # --diff: если повтор что-то меняет, в логе видно, что именно
+          sudo ./deploy.sh --diff -e gitops_revision="$GITOPS_REVISION" -e gitops_repo_url="$GITOPS_REPO_URL" | tee deploy-2.log
           recap=$(grep -A1 'PLAY RECAP' deploy-2.log | grep -Eo 'changed=[0-9]+' | sort -u)
           echo "Recap: $recap"
           if [ "$recap" != "changed=0" ]; then
