@@ -131,6 +131,12 @@ breaker, local rate limit 5 запросов/с на `/limited` → 429;
 отклонение заголовков с `_`, сохранение `X-Request-Id`. `/error` вынесен в
 отдельное правило (`#3`), чтобы намеренные 500 не портили SLI.
 
+Прогрессивная доставка (ROLLOUT-001): Argo Rollouts v1.10.0 + плагин
+Gateway API v0.17.0. `hello` — Rollout: canary 10 → 30 → 60 → 100% через
+веса правила `/` (`hello` / `hello-canary`), фоновый анализ доли 5xx в
+Prometheus (< 2%), при провале — автоматический откат. `make release-good`,
+`make release-bad`, `make release-reset`.
+
 Исходный план GW-002: маршруты по path, два backend `v1`/`v2`
 с весами 80/20, маршрут, отвечающий 500 (для графика кодов), TLS-listener с
 сертификатом от cert-manager (self-signed `ClusterIssuer`, ключи не попадают
