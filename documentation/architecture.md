@@ -213,6 +213,10 @@ Gateway, маршруты, мониторы). Если Ansible не устано
 ставит его первым шагом. Playbook запускается на самом узле
 (`connection: local`); inventory для удалённого узла — опционально.
 
+Переустановка: `sudo ./destroy.sh` (`ansible/destroy.yml`) удаляет кластер
+и состояние решения, оставляя пакеты и образы. Удалённый узел: хост в
+`ansible/inventory.ini` — файлы копируются в `/opt/devops-case` (AUTO-001).
+
 Что покрывает одна команда `make deploy`:
 
 1. подготовка узла Ubuntu 24.04 (пакеты, sysctl, swap, runtime);

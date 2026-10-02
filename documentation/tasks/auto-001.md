@@ -61,6 +61,7 @@
 |---|---|
 | `destroy.sh --yes` на работающем кластере | 12 с, `failed=0`; после: нет `/etc/kubernetes`, `/var/run/calico`, 0 правил iptables KUBE-/cali-, 0 запущенных контейнеров, kubelet остановлен, интерфейсы `cali*` удалены |
 | `deploy.sh` после destroy | 316 с (пакеты и образы в кэше), `failed=0`; повтор — `changed=0`; `verify.sh` — все проверки |
+| GitHub Actions | [run 37024305998](https://github.com/glev23/devops_case/actions/runs/37024305998) — все шаги зелёные |
 | Удалённый режим (SSH к узлу как к удалённому хосту, `ansible_host=127.0.0.1`) | первый прогон — `changed=1` (копирование файлов в `/opt/devops-case`), повтор — `changed=0` |
 
 **Найдено и исправлено:**

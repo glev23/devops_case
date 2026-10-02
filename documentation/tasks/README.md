@@ -132,6 +132,7 @@
 | [ROLLOUT-001](./rollout-001.md) | `done` |
 | [TRACE-001](./trace-001.md) | `done` |
 | [DEMO-001](./demo-001.md) | `done` |
+| [AUTO-001](./auto-001.md) | `done` |
 | [CI-001](./ci-001.md) | `done` |
 
 Статусы в этой таблице справочные — канонические только в `progress_dev.md`.
