@@ -7,6 +7,32 @@
     state: present
     definition: "{{ lookup('ansible.builtin.template', 'application.yaml.j2') | from_yaml }}"
 
+# Если self-heal выключен (demo), Argo CD не синхронизирует ручные изменения
+# сам — deploy.sh приводит такое приложение к Git явно. В штатном состоянии
+# (Synced) ничего не запускается — повторный запуск даёт changed=0.
+- name: Read sync state of Application {{ item.name }}
+  ansible.builtin.command: >
+    kubectl -n argocd get application/{{ item.name }}
+    -o jsonpath={.status.sync.status}/{.status.operationState.phase}
+  environment:
+    KUBECONFIG: "{{ kubeconfig }}"
+  register: workloads_app_state
+  until: workloads_app_state.stdout.split('/')[0] in ['Synced', 'OutOfSync']
+  retries: 30
+  delay: 5
+  changed_when: false
+
+- name: Request sync of Application {{ item.name }}
+  ansible.builtin.command: >
+    kubectl -n argocd patch application/{{ item.name }} --type merge
+    -p '{"operation":{"initiatedBy":{"username":"deploy.sh"},"sync":{"revision":"{{ gitops_revision }}"}}}'
+  environment:
+    KUBECONFIG: "{{ kubeconfig }}"
+  when:
+    - workloads_app_state.stdout.split('/')[0] == 'OutOfSync'
+    - workloads_app_state.stdout.split('/')[1] | default('') != 'Running'
+  changed_when: true
+
 - name: Wait for Git sync of Application {{ item.name }}
   ansible.builtin.command: >
     kubectl -n argocd wait application/{{ item.name }}

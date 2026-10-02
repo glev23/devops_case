@@ -18,10 +18,25 @@ workloads_items:
     # коммитом: self-heal откатил бы их за секунды. Синхронизация по новым
     # коммитам остаётся (automated sync), ручные изменения видны как OutOfSync.
     self_heal: false
-    # Веса stable/canary в правиле "/" ведёт Argo Rollouts во время релиза
+    # Поля, которые во время работы меняет Argo Rollouts, не считаются
+    # расхождением с Git (при синхронизации нового коммита манифест
+    # применяется целиком — RespectIgnoreDifferences не используется: он
+    # подставляет живой список backendRefs и не даёт добавить новый backend)
     ignore_differences:
+      # веса stable/canary в правиле "/"
       - group: gateway.networking.k8s.io
         kind: HTTPRoute
         name: hello
         jqPathExpressions:
           - .spec.rules[2].backendRefs[].weight
+      # хэш шаблона пода, который Rollouts добавляет в селекторы
+      - group: ""
+        kind: Service
+        name: hello
+        jsonPointers:
+          - /spec/selector
+      - group: ""
+        kind: Service
+        name: hello-canary
+        jsonPointers:
+          - /spec/selector

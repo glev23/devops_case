@@ -106,6 +106,13 @@ jobs:
       - name: Verify
         run: ./scripts/verify.sh
 
+      # Прогрессивная доставка (ROLLOUT-001): анализ метрик решает судьбу релиза
+      - name: Canary release — bad version is rolled back automatically
+        run: ./scripts/release.sh bad && ./scripts/release.sh reset
+
+      - name: Canary release — good version reaches 100%
+        run: ./scripts/release.sh good && ./scripts/release.sh reset
+
       - name: Collect diagnostics
         if: failure()
         run: |

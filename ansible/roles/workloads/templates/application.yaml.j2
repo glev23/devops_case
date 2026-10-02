@@ -20,8 +20,6 @@ spec:
     automated:
       prune: true
       selfHeal: {{ item.self_heal | default(true) | bool | lower }}
-    syncOptions:
-      - RespectIgnoreDifferences=true
     retry:
       limit: 5
       backoff:
