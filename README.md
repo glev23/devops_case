@@ -47,44 +47,35 @@ SLO, трейсинг, GitOps, canary-релизы с автоматически
 ## 2. Архитектура
 
 ```mermaid
-flowchart LR
-    user(["Пользователь<br/>curl, браузер"])
-    git[("GitHub<br/>этот репозиторий")]
+flowchart TB
+    user(["Пользователь: curl, браузер"])
 
-    subgraph cluster["Узел Ubuntu 24.04 · kubeadm 1.36.5 · containerd · Calico"]
-        subgraph gw["Gateway API · Envoy Gateway 1.9.2"]
-            envoy["Envoy proxy<br/>Gateway gateway/main<br/>NodePort 30080 / 30443"]
+    subgraph k8s["Kubernetes 1.36.5 (kubeadm) · Ubuntu 24.04 · containerd · Calico"]
+        subgraph gwapi["Gateway API · Envoy Gateway 1.9.2"]
+            envoy["Envoy proxy<br/>GatewayClass eg → Gateway gateway/main → HTTPRoute"]
         end
-        subgraph demo["namespace demo"]
-            hello["hello<br/>nginx, 2 реплики<br/>(Argo Rollout)"]
-            v2["hello-v2<br/>nginx"]
+        subgraph app["Приложение · namespace demo"]
+            hello["Service hello<br/>nginx, 2 реплики"]
+            v2["Service hello-v2<br/>nginx"]
         end
-        subgraph obs["Наблюдаемость"]
-            prom["Prometheus<br/>kube-prometheus-stack"]
-            graf["Grafana"]
-            fluentd["Fluentd<br/>DaemonSet"]
-            loki[("Loki")]
-            tempo[("Tempo")]
-        end
-        argocd["Argo CD"]
-        rollouts["Argo Rollouts"]
+        fluentd["Fluentd<br/>DaemonSet"]
+        prom["Prometheus<br/>kube-prometheus-stack"]
+        loki[("Loki")]
+        tempo[("Tempo")]
+        graf["Grafana<br/>метрики · логи · трейсы"]
     end
 
-    user -->|"HTTP / HTTPS"| envoy
-    envoy -->|"HTTPRoute: /, /canary 80%"| hello
-    envoy -->|"/v2, /canary 20%"| v2
-    envoy -->|"Host: grafana / prometheus / argocd.devops.test"| graf
-    hello -. "access-лог JSON, stdout" .-> fluentd
+    user -->|"NodePort 30080 HTTP · 30443 HTTPS"| envoy
+    envoy -->|"/ · /canary 80%"| hello
+    envoy -->|"/v2 · /canary 20%"| v2
+    hello -.->|"access-лог JSON, stdout"| fluentd
+    hello -.->|"метрики nginx"| prom
+    envoy -.->|"HTTP-метрики"| prom
+    envoy -.->|"трейсы OTLP"| tempo
     fluentd --> loki
-    envoy -. "трейсы OTLP" .-> tempo
-    prom -. "метрики" .-> envoy
-    prom -. "метрики" .-> hello
-    graf --> prom
-    graf --> loki
-    graf --> tempo
-    git -->|"pull deploy/*"| argocd
-    rollouts -->|"веса HTTPRoute"| envoy
-    rollouts -->|"анализ доли 5xx"| prom
+    prom --> graf
+    loki --> graf
+    tempo --> graf
 ```
 
 **Путь запроса.** Клиент обращается к NodePort узла (30080 или 30443).
@@ -105,8 +96,22 @@ stderr. Fluentd на узле читает `/var/log/containers/*.log`, доба
 `namespace`, `pod`, `container`, `stream`, разбирает JSON и отправляет записи
 в Loki. Логи и метрики просматриваются в одной Grafana.
 
-**Развёртывание.** `deploy.sh` устанавливает Ansible из репозитория Ubuntu и
-запускает `ansible/site.yml`:
+**Развёртывание и доставка.** `deploy.sh` устанавливает Ansible из
+репозитория Ubuntu и запускает `ansible/site.yml`. Ansible готовит узел,
+создаёт кластер и ставит Helm-чарты платформы. Собственные манифесты из
+каталога `deploy/` доставляет Argo CD: кластер сам забирает их из Git. Argo
+Rollouts выполняет canary-релизы приложения, управляя весами `HTTPRoute`.
+
+```mermaid
+flowchart LR
+    cmd(["sudo ./deploy.sh"]) --> ansible["Ansible<br/>ansible/site.yml"]
+    ansible -->|"ОС, kubeadm, Calico"| cluster["Кластер"]
+    ansible -->|"Helm-чарты"| platform["Envoy Gateway, cert-manager,<br/>kube-prometheus-stack, Loki, Tempo,<br/>Argo CD, Argo Rollouts"]
+    ansible -->|"Application"| argocd["Argo CD"]
+    git[("GitHub<br/>deploy/*")] -->|"pull"| argocd
+    argocd -->|"Kustomize"| res["Gateway, HTTPRoute, приложение,<br/>Fluentd, мониторы, алерты, дашборды"]
+    rollouts["Argo Rollouts"] -->|"веса HTTPRoute,<br/>анализ 5xx в Prometheus"| res
+```
 
 | Play | Роли | Что делает |
 |---|---|---|
