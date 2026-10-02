@@ -1,0 +1,17 @@
+---
+# Grafana Tempo — хранилище трейсов (TRACE-001). Envoy Gateway отправляет
+# спаны по OTLP (настройка в deploy/gateway/envoyproxy.yaml).
+
+- name: Install Tempo
+  kubernetes.core.helm:
+    kubeconfig: "{{ kubeconfig }}"
+    release_name: tempo
+    release_namespace: tracing
+    create_namespace: true
+    chart_repo_url: https://grafana-community.github.io/helm-charts
+    chart_ref: tempo
+    chart_version: "{{ tempo_chart_version }}"
+    values_files:
+      - "{{ repo_root }}/helm-values/tempo.yaml"
+    wait: true
+    wait_timeout: 10m

@@ -1,0 +1,37 @@
+# Grafana Tempo 3.1 (чарт grafana-community/tempo, single binary) — хранилище
+# трейсов (TRACE-001). Прокси Envoy Gateway отправляет спаны по OTLP gRPC :4317.
+# Хранение — на emptyDir (в кластере нет StorageClass), срок — 48 ч.
+tempo:
+  reportingEnabled: false
+  retention: 48h
+  # Только OTLP — Envoy Gateway отправляет трейсы в нём; Jaeger/Zipkin не нужны
+  receivers:
+    otlp:
+      protocols:
+        grpc:
+          endpoint: 0.0.0.0:4317
+        http:
+          endpoint: 0.0.0.0:4318
+  # Без PVC чарт ничего не монтирует в /var/tempo — данные (WAL, блоки) на emptyDir
+  extraVolumeMounts:
+    - name: data
+      mountPath: /var/tempo
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop: [ALL]
+  resources:
+    requests:
+      cpu: 20m
+      memory: 128Mi
+    limits:
+      memory: 768Mi
+
+extraVolumes:
+  - name: data
+    emptyDir:
+      sizeLimit: 2Gi
+
+serviceMonitor:
+  enabled: true

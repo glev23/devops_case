@@ -53,6 +53,10 @@ grafana:
       reporting_enabled: false
       check_for_updates: false
   # Логи из Loki рядом с метриками: Explore → Loki
+  # Метрики, логи и трейсы связаны между собой (TRACE-001):
+  #   строка лога nginx (поле traceparent) → кнопка «Трейс в Tempo»;
+  #   трейс в Tempo → логи Loki с этим trace ID.
+  # $$ — экранирование: Grafana подставляет переменные окружения в provisioning.
   additionalDataSources:
     - name: Loki
       type: loki
@@ -61,6 +65,28 @@ grafana:
       access: proxy
       jsonData:
         maxLines: 1000
+        derivedFields:
+          - name: TraceID
+            matcherRegex: '"traceparent":"00-([0-9a-f]{32})-'
+            url: "$${__value.raw}"
+            datasourceUid: tempo
+            urlDisplayLabel: Трейс в Tempo
+    - name: Tempo
+      type: tempo
+      uid: tempo
+      url: http://tempo.tracing:3200
+      access: proxy
+      jsonData:
+        nodeGraph:
+          enabled: true
+        lokiSearch:
+          datasourceUid: loki
+        tracesToLogsV2:
+          datasourceUid: loki
+          spanStartTimeShift: -5m
+          spanEndTimeShift: 5m
+          customQuery: true
+          query: '{namespace="demo"} |= "$${__trace.traceId}"'
   resources:
     requests:
       cpu: 20m

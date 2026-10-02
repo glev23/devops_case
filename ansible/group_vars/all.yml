@@ -41,6 +41,9 @@ gitops_repo_url: https://github.com/glev23/devops_case.git
 gitops_revision: main
 argocd_chart_version: "10.9.6"   # Argo CD v3.5.3
 
+# Трейсинг (TRACE-001): Tempo 3.1 (чарт перенесён в grafana-community)
+tempo_chart_version: "3.1.0"
+
 # Прогрессивная доставка (ROLLOUT-001): Argo Rollouts + плагин Gateway API v0.17.0
 argo_rollouts_chart_version: "2.43.2"
 argo_rollouts_version: "v1.10.0"

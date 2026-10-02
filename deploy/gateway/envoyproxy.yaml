@@ -1,12 +1,31 @@
 # Параметры прокси для GatewayClass eg: на bare-metal нет облачного
 # LoadBalancer, поэтому прокси публикуется через NodePort с фиксированными
 # портами: HTTP 80 → 30080, HTTPS 443 → 30443.
+# Трейсинг (TRACE-001): каждый запрос через Gateway — трейс в Grafana Tempo
+# по OTLP; заголовок traceparent (W3C) передаётся в backend и пишется в
+# access-лог nginx — по нему из строки лога в Loki открывается трейс.
 apiVersion: gateway.envoyproxy.io/v1alpha1
 kind: EnvoyProxy
 metadata:
   name: nodeport
   namespace: envoy-gateway-system
 spec:
+  telemetry:
+    tracing:
+      samplingRate: 100
+      provider:
+        type: OpenTelemetry
+        backendRefs:
+          - group: ""
+            kind: Service
+            name: tempo
+            namespace: tracing
+            port: 4317
+      customTags:
+        k8s.cluster:
+          type: Literal
+          literal:
+            value: devops-case
   provider:
     type: Kubernetes
     kubernetes:

@@ -276,6 +276,43 @@ else
   fail "запрос $gw_trace не найден в Loki"
 fi
 
+section "Трейсинг (Envoy → Tempo, связь с логами)"
+# Запрос с известным trace ID (W3C traceparent): Envoy продолжает этот трейс,
+# отправляет спан в Tempo и передаёт traceparent в nginx — он попадает в лог
+trace_id=$(tr -dc 'a-f0-9' < /dev/urandom | head -c 32 || true)
+span_id=$(tr -dc 'a-f0-9' < /dev/urandom | head -c 16 || true)
+curl -s -m 5 -o /dev/null -H "traceparent: 00-$trace_id-$span_id-01" "$GATEWAY_URL/?trace=tempo-check" || true
+tempo_ok=""
+for _ in 1 2 3 4 5 6 7 8; do
+  tempo_out=$(in_cluster "curl -s -m 5 -o /dev/null -w '%{http_code}' http://tempo.tracing:3200/api/v2/traces/$trace_id")
+  [[ $tempo_out == 200 ]] && tempo_ok=1 && break
+  sleep 5
+done
+if [[ -n $tempo_ok ]]; then
+  ok "трейс $trace_id найден в Tempo (запрос через Gateway с traceparent)"
+else
+  fail "трейс $trace_id не найден в Tempo (последний ответ: ${tempo_out:-нет})"
+fi
+trace_line=""
+for _ in 1 2 3 4 5 6; do
+  trace_out=$(in_cluster "curl -s -m 10 -G '$LOKI_URL' --data-urlencode 'since=10m' --data-urlencode 'query={namespace=\"demo\",container=\"nginx\"} |= \"$trace_id\"'")
+  trace_line=$(grep -m1 '^{' <<< "$trace_out" | python3 -c '
+import json, sys
+try:
+    r = json.load(sys.stdin)["data"]["result"]
+    print("found" if r else "")
+except Exception:
+    print("")
+' || true)
+  [[ -n $trace_line ]] && break
+  sleep 5
+done
+if [[ -n $trace_line ]]; then
+  ok "та же строка в Loki (поле traceparent) — в Grafana из лога открывается трейс"
+else
+  fail "строка с trace ID $trace_id не найдена в Loki"
+fi
+
 section "Grafana и маршрутизация по hostname"
 gw_host() { curl -s -m 10 -H "Host: $1" "${@:3}" "$GATEWAY_URL$2"; }
 
@@ -305,7 +342,7 @@ fi
 
 # Источники данных Grafana: Grafana сама обращается к Prometheus и Loki
 graf_pw=$(kubectl -n monitoring get secret grafana-admin -o jsonpath='{.data.admin-password}' | base64 -d)
-for ds in prometheus loki; do
+for ds in prometheus loki tempo; do
   ds_status=$(gw_host grafana.devops.test "/api/datasources/uid/$ds/health" -u "admin:$graf_pw" \
     | python3 -c 'import json,sys; print(json.load(sys.stdin).get("status",""))' 2>/dev/null || true)
   if [[ $ds_status == OK ]]; then
