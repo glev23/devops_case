@@ -56,5 +56,7 @@ helm_version: "v3.22.0"
 kube_user: "{{ lookup('ansible.builtin.env', 'SUDO_USER') | default('root', true) }}"
 kubeconfig: /etc/kubernetes/admin.conf
 
-# Корень репозитория (манифесты Kustomize лежат в deploy/)
+# Корень репозитория (манифесты Kustomize лежат в deploy/). На удалённый узел
+# файлы копируются в remote_repo_root (play «Repository files on the node»).
 repo_root: "{{ playbook_dir | dirname }}"
+remote_repo_root: /opt/devops-case

@@ -34,6 +34,17 @@
     name: kubelet
     enabled: true
 
+# Каталог создаёт пакет kubelet при установке, но после destroy.sh пакеты
+# остаются, а каталог удалён — создаём явно
+- name: Create Kubernetes config directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - /etc/kubernetes
+    - /etc/kubernetes/manifests
+
 - name: Render kubeadm config
   ansible.builtin.template:
     src: kubeadm-config.yaml.j2

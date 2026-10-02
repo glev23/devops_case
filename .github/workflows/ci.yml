@@ -45,7 +45,7 @@ jobs:
         run: ansible-lint ansible/
 
       - name: shellcheck
-        run: shellcheck deploy.sh scripts/*.sh ci/*.sh
+        run: shellcheck deploy.sh destroy.sh scripts/*.sh ci/*.sh
 
       - name: Kustomize build + kubeconform
         run: |

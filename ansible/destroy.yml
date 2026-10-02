@@ -1,0 +1,69 @@
+---
+# Полное удаление кластера с узла — для переустановки с нуля (./destroy.sh).
+# Пакеты (kubeadm, kubelet, containerd, Helm) и скачанные образы остаются —
+# повторный deploy.sh ставит кластер заново быстрее.
+- name: Destroy Kubernetes cluster
+  hosts: k8s
+  become: true
+  tasks:
+    - name: Check kubeadm
+      ansible.builtin.stat:
+        path: /usr/bin/kubeadm
+      register: destroy_kubeadm
+
+    - name: Reset kubeadm node (control plane, etcd, kubelet state)
+      ansible.builtin.command: kubeadm reset --force
+      when: destroy_kubeadm.stat.exists
+      changed_when: true
+
+    # Calico монтирует cgroup2 в /var/run/calico/cgroup — без размонтирования
+    # каталог не удалить (Operation not permitted)
+    - name: Unmount Calico cgroup
+      ansible.posix.mount:
+        path: /var/run/calico/cgroup
+        state: unmounted
+
+    - name: Remove CNI, Calico, kubeconfig and Fluentd state
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /etc/cni/net.d
+        - /var/lib/cni
+        - /var/lib/calico
+        - /var/run/calico
+        - /var/log/fluentd
+        - /etc/kubernetes
+        - /root/.kube
+        - "/home/{{ kube_user }}/.kube"
+        - "{{ remote_repo_root }}"
+
+    # vxlan.calico и veth-интерфейсы подов (cali*); tunl0 — системное
+    # устройство модуля ipip, его не удалить, и оно безвредно
+    - name: Remove Calico network interfaces
+      ansible.builtin.shell: |
+        set -o pipefail
+        for link in vxlan.calico $(ip -br link | awk '/^cali/ {sub(/@.*/, "", $1); print $1}'); do
+          ip link delete "$link" 2>/dev/null && echo "deleted $link"
+        done
+        true
+      args:
+        executable: /bin/bash
+      register: destroy_links
+      changed_when: destroy_links.stdout | length > 0
+
+    # Только цепочки Kubernetes и Calico — остальные правила узла не трогаются
+    - name: Remove Kubernetes and Calico iptables rules
+      ansible.builtin.shell: |
+        set -o pipefail
+        for cmd in iptables ip6tables; do
+          "$cmd-save" | grep -v -E 'KUBE-|cali-|cali:' | "$cmd-restore"
+        done
+      args:
+        executable: /bin/bash
+      changed_when: true
+
+    - name: Restart containerd
+      ansible.builtin.systemd_service:
+        name: containerd
+        state: restarted

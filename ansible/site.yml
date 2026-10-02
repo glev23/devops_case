@@ -1,4 +1,24 @@
 ---
+# Удалённый узел (в inventory не localhost): манифесты, values и скрипты
+# копируются на узел — роли применяют их там (kubectl/helm работают на узле).
+# Локальный запуск (sudo ./deploy.sh на самом узле) использует репозиторий как есть.
+- name: Repository files on the node
+  hosts: k8s
+  become: true
+  tasks:
+    - name: Copy repository files to a remote node
+      ansible.builtin.copy:
+        src: "{{ playbook_dir | dirname }}/{{ item }}"
+        dest: "{{ remote_repo_root }}/"
+        mode: preserve
+      loop: [deploy, helm-values, scripts, Makefile]
+      when: ansible_connection | default('ssh') != 'local'
+
+    - name: Use the copied files on a remote node
+      ansible.builtin.set_fact:
+        repo_root: "{{ remote_repo_root }}"
+      when: ansible_connection | default('ssh') != 'local'
+
 - name: Kubernetes node and cluster
   hosts: k8s
   become: true
