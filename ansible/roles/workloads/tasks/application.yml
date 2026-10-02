@@ -31,7 +31,7 @@
 - name: Read sync state of Application {{ item.name }}
   ansible.builtin.command: >
     kubectl -n argocd get application/{{ item.name }}
-    -o jsonpath={.status.sync.status}/{.status.operationState.phase}
+    -o jsonpath={.status.sync.status}/{.status.operationState.phase}/{.status.sync.revision}
   environment:
     KUBECONFIG: "{{ kubeconfig }}"
   register: workloads_app_state
@@ -40,10 +40,13 @@
   delay: 5
   changed_when: false
 
+# Ревизия — разрешённый SHA из статуса, а не имя ветки: Argo CD сравнивает
+# ревизию последней синхронизации с текущим SHA, и строка "main" выглядела бы
+# как новая ревизия — автосинхронизация откатила бы демонстрационный релиз.
 - name: Request sync of Application {{ item.name }}
   ansible.builtin.command: >
     kubectl -n argocd patch application/{{ item.name }} --type merge
-    -p '{"operation":{"initiatedBy":{"username":"deploy.sh"},"sync":{"revision":"{{ gitops_revision }}"}}}'
+    -p '{"operation":{"initiatedBy":{"username":"deploy.sh"},"sync":{"revision":"{{ workloads_app_state.stdout.split('/')[2] }}"}}}'
   environment:
     KUBECONFIG: "{{ kubeconfig }}"
   when:

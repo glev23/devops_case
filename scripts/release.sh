@@ -55,6 +55,30 @@ sample_traffic() {
   printf 'ответы: стабильная=%s новая=%s ошибки=%s' "$stable" "$new" "$errors"
 }
 
+# Та же доля 5xx правила "/", что считает AnalysisTemplate (окно 1 мин).
+# Запрос — через прокси API-сервера к Service Prometheus (доступ по kubeconfig).
+error_ratio() {
+  local q='(sum(rate(envoy_cluster_upstream_rq_xx{envoy_cluster_name="httproute/demo/hello/rule/2",envoy_response_code_class="5"}[1m])) or vector(0)) / (sum(rate(envoy_cluster_upstream_rq_total{envoy_cluster_name="httproute/demo/hello/rule/2"}[1m])) > 0 or vector(1))'
+  kubectl get --raw "/api/v1/namespaces/monitoring/services/kps-prometheus:9090/proxy/api/v1/query?query=$(python3 -c 'import sys,urllib.parse; print(urllib.parse.quote(sys.argv[1]))' "$q")" \
+    | python3 -c 'import json,sys; r=json.load(sys.stdin)["data"]["result"]; print(r[0]["value"][1] if r else "0")'
+}
+
+# Анализ смотрит на последнюю минуту: если в ней ещё есть ошибки (например,
+# только что откатанного релиза), новый релиз провалил бы анализ не по своей вине
+wait_clean_window() {
+  local start=$SECONDS ratio
+  while (( SECONDS - start < 180 )); do
+    ratio=$(error_ratio || echo 1)
+    if awk -v r="$ratio" 'BEGIN { exit !(r < 0.005) }'; then
+      return 0
+    fi
+    say "${c_dim}  ждём, пока из окна анализа уйдут ошибки (доля 5xx за 1 мин: $ratio)…${c_0}"
+    sleep 10
+  done
+  say "${c_bad}✘ Доля 5xx не опустилась ниже 0,5% за 3 мин — релиз не начат.${c_0}"
+  exit 1
+}
+
 watch_release() {
   local expect=$1 start=$SECONDS seen_progress=0 phase step weights analysis
   say ""
@@ -113,6 +137,7 @@ release() {
     exit 1
   fi
   say "${c_b}Релиз $VERSION приложения hello (canary через Gateway API, анализ в Prometheus)${c_0}"
+  wait_clean_window
   cmd "kubectl -n $NS create configmap hello-release-$VERSION --from-file=nginx.conf"
   kubectl -n "$NS" create configmap "hello-release-$VERSION" --from-literal=nginx.conf="$new_conf" \
     --dry-run=client -o yaml \
