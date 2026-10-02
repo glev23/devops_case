@@ -105,12 +105,10 @@ Rollouts выполняет canary-релизы приложения, управ
 ```mermaid
 flowchart LR
     cmd(["sudo ./deploy.sh"]) --> ansible["Ansible<br/>ansible/site.yml"]
-    ansible -->|"ОС, kubeadm, Calico"| cluster["Кластер"]
-    ansible -->|"Helm-чарты"| platform["Envoy Gateway, cert-manager,<br/>kube-prometheus-stack, Loki, Tempo,<br/>Argo CD, Argo Rollouts"]
+    ansible -->|"kubeadm, Calico,<br/>Helm-чарты платформы"| cluster["Кластер<br/>и платформа"]
     ansible -->|"Application"| argocd["Argo CD"]
     git[("GitHub<br/>deploy/*")] -->|"pull"| argocd
-    argocd -->|"Kustomize"| res["Gateway, HTTPRoute, приложение,<br/>Fluentd, мониторы, алерты, дашборды"]
-    rollouts["Argo Rollouts"] -->|"веса HTTPRoute,<br/>анализ 5xx в Prometheus"| res
+    argocd -->|"манифесты Kustomize"| cluster
 ```
 
 | Play | Роли | Что делает |
