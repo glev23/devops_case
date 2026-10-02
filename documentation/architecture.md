@@ -33,7 +33,9 @@
                   Ubuntu 24.04 · make deploy → Ansible → kubeadm + Helm + Kustomize · make verify
 ```
 
-Для паспорта эта схема перерисовывается картинкой после выбора стека.
+Актуальные схемы (поток запросов и данных, развёртывание и доставка) — в
+корневом README, раздел 2, в формате Mermaid. Для паспорта схема
+перерисовывается картинкой.
 Кейс требует показать путь `Пользователь → Gateway API → приложение`, а
 также мониторинг и логирование.
 
@@ -231,18 +233,22 @@ Gateway, маршруты, мониторы). Если Ansible не устано
 
 ```
 README.md              — инструкция для эксперта (DOCS-002)
-Makefile               — deploy, verify, destroy, lint
-ansible/               — playbook и роли: node (ОС, containerd), kubeadm, cni, platform
+deploy.sh, destroy.sh  — установка и удаление
+Makefile               — deploy, verify, demo, release-*, destroy
+ansible/               — playbook site.yml/destroy.yml и роли: node, kubeadm, cni, helm,
+                         certmanager, gateway, monitoring, logging, tracing, rollouts,
+                         gitops, workloads, kustomize
   group_vars/all.yml   — все версии в одном месте
 deploy/                — Kustomize: наши ресурсы
-  app/  gateway/  monitoring/  logging/
+  app/  gateway/  monitoring/  logging/  argocd/
 helm-values/           — values для сторонних чартов
-scripts/               — verify.sh (smoke: curl, PromQL, поиск в Loki)
+scripts/               — verify.sh, demo.sh, release.sh
+ci/                    — подготовка раннера GitHub (только CI)
 .github/workflows/     — CI (CI-001)
 documentation/         — эта документация
 ```
 
-Раскладка уточняется в AUTO-001, изменения фиксируются в «Истории решений».
+Подробная раскладка с назначением каталогов — README, раздел 10.
 
 ---
 
@@ -313,6 +319,10 @@ pull-модели (CD-001) — кластер сам забирает измен
 - Настройки kubeadm (включая адреса метрик control plane) применяются только
   при создании кластера; на уже созданном кластере их изменение не
   применяется повторным `deploy.sh`.
+- Только x86_64 (amd64): Helm и CLI Argo Rollouts загружаются в сборке
+  `linux-amd64` (DOCS-002).
+- В режиме по умолчанию Argo CD берёт `deploy/*` из репозитория на GitHub;
+  без доступа к нему — `-e gitops_enabled=false` (DOCS-002).
 
 ---
 
@@ -341,6 +351,16 @@ pull-модели (CD-001) — кластер сам забирает измен
 ---
 
 ## История решений
+
+**[02.10.2026] Корневой README (DOCS-002).** README — единственный источник
+команд развёртывания и проверки для эксперта. Ручные проверки построены так,
+чтобы не требовать дополнительных инструментов и port-forward: PromQL —
+через Gateway (`prometheus.devops.test`, basic auth), LogQL — через прокси
+API-сервера Kubernetes (`kubectl get --raw`). Версии в README сверены с
+работающим кластером (`helm list -A`, образы подов). Схема архитектуры
+разделена на две (поток данных и доставка): одна общая схема в Mermaid
+получалась нечитаемой из-за пересекающихся связей. В ограничения добавлены
+архитектура amd64 и зависимость режима GitOps от доступа к GitHub.
 
 **[01.10.2026] Второй пакет дополнительных возможностей (D-09…D-12).** База готова за первый день, до
 дедлайна 3,5 дня — запланированы дополнительные возможности, усиливающие
