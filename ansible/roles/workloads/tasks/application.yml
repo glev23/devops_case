@@ -1,11 +1,29 @@
 ---
 # Одно приложение Argo CD: создать Application и дождаться синхронизации с Git.
 
-- name: Create Argo CD Application {{ item.name }}
+# Сравнивается только spec: status Application Argo CD обновляет постоянно, и
+# сравнение объекта целиком давало ложный changed при совпадении по времени.
+- name: Render Argo CD Application {{ item.name }}
+  ansible.builtin.set_fact:
+    workloads_app: "{{ lookup('ansible.builtin.template', 'application.yaml.j2') | from_yaml }}"
+
+- name: Read current Argo CD Application {{ item.name }}
+  kubernetes.core.k8s_info:
+    kubeconfig: "{{ kubeconfig }}"
+    api_version: argoproj.io/v1alpha1
+    kind: Application
+    namespace: argocd
+    name: "{{ item.name }}"
+  register: workloads_app_live
+
+- name: Create or update Argo CD Application {{ item.name }}
   kubernetes.core.k8s:
     kubeconfig: "{{ kubeconfig }}"
     state: present
-    definition: "{{ lookup('ansible.builtin.template', 'application.yaml.j2') | from_yaml }}"
+    definition: "{{ workloads_app }}"
+  when: >-
+    workloads_app_live.resources | length == 0
+    or workloads_app_live.resources[0].spec != workloads_app.spec
 
 # Если self-heal выключен (demo), Argo CD не синхронизирует ручные изменения
 # сам — deploy.sh приводит такое приложение к Git явно. В штатном состоянии
