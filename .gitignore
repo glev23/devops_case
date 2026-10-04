@@ -12,3 +12,6 @@ kubeconfig*
 # Кэши инструментов, если $HOME не задан
 ansible/.cache/
 ansible/.kube/
+
+# Материалы сдачи (архив, PDF) собираются локально
+/submission/

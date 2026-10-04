@@ -99,7 +99,7 @@ Ubuntu 24.04 и проверяет каждый обязательный ком�
 | Проверка | Результат |
 |---|---|
 | Ручные команды README на стенде | Все выполнены, вывод совпадает с описанным: `Hello World! from hello-…`, `x-backend: v1`/`v2`, `/canary` 17/3 из 20, `/error` → 500, HTTPS по CA, `/limited` → `200×5 429×10`, Grafana `/api/health` → `database: ok`, 4 Application `Synced`/`Healthy` |
-| PromQL через Gateway (basic auth) | `up{job="hello"}` — 2 target со значением 1; `count(up == 0)` = 0; 24 job `UP`; RPS по правилам `demo/hello#0…#3`; классы кодов 2/4/5; p95, память подов, `slo:sli:availability_3d` = 1 |
+| PromQL через Gateway (basic auth) | `up{job="hello"}` — 2 target со значением 1; `count(up == 0)` = 0; 23 job `UP`; RPS по правилам `demo/hello#0…#3`; классы кодов 2/4/5; p95, память подов, `slo:sli:availability_3d` = 1 |
 | LogQL через прокси API-сервера | Запрос `?trace=readme-check-1` найден в Loki через ~10 с: `status 200`, `x_forwarded_for`, `traceparent` |
 | Версии | Сверены с `group_vars/all.yml`, `helm list -A` и образами подов на стенде |
 | Ресурсы стенда со всем стеком | ~4,6 ГБ RAM, ~12 ГБ диска (VM 4 vCPU / 8 ГБ / 50 ГБ) |
