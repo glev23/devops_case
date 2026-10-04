@@ -136,6 +136,7 @@
 | [DOCS-002](./docs-002.md) | `done` |
 | [QA-001](./qa-001.md) | `done` |
 | [PASSPORT-001](./passport-001.md) | `done` |
+| [SUBMIT-001](./submit-001.md) | `done` |
 | [CI-001](./ci-001.md) | `done` |
 
 Статусы в этой таблице справочные — канонические только в `progress_dev.md`.
