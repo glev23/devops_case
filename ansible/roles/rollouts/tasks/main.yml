@@ -14,6 +14,10 @@
       - "{{ repo_root }}/helm-values/argo-rollouts.yaml"
     wait: true
     wait_timeout: 10m
+  register: rollouts_helm
+  until: rollouts_helm is succeeded
+  retries: 2
+  delay: 20
 
 # CLI для наблюдения за релизом: kubectl argo rollouts get rollout hello -n demo --watch
 - name: Install kubectl argo rollouts plugin
@@ -22,3 +26,7 @@
     dest: /usr/local/bin/kubectl-argo-rollouts
     checksum: "sha256:{{ argo_rollouts_cli_sha256 }}"
     mode: "0755"
+  register: rollouts_cli
+  until: rollouts_cli is succeeded
+  retries: 3
+  delay: 10

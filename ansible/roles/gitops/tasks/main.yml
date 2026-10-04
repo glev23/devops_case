@@ -26,6 +26,10 @@
       - "{{ repo_root }}/helm-values/argo-cd.yaml"
     wait: true
     wait_timeout: 10m
+  register: gitops_helm
+  until: gitops_helm is succeeded
+  retries: 2
+  delay: 20
 
 - name: Apply Argo CD UI route
   ansible.builtin.include_role:

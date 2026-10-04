@@ -11,3 +11,7 @@
     chart_version: "{{ envoy_gateway_version }}"
     wait: true
     wait_timeout: 10m
+  register: gateway_helm
+  until: gateway_helm is succeeded
+  retries: 2
+  delay: 20

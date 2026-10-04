@@ -6,6 +6,10 @@
     url: "https://raw.githubusercontent.com/projectcalico/calico/{{ calico_version }}/manifests/tigera-operator.yaml"
     dest: "/etc/kubernetes/tigera-operator-{{ calico_version }}.yaml"
     mode: "0644"
+  register: cni_operator_manifest
+  until: cni_operator_manifest is succeeded
+  retries: 3
+  delay: 10
 
 - name: Apply tigera-operator
   kubernetes.core.k8s:

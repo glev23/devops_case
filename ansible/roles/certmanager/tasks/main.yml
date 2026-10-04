@@ -28,3 +28,7 @@
             memory: 48Mi
     wait: true
     wait_timeout: 10m
+  register: certmanager_helm
+  until: certmanager_helm is succeeded
+  retries: 2
+  delay: 20

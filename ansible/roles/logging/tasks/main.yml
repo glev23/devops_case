@@ -14,3 +14,7 @@
       - "{{ repo_root }}/helm-values/loki.yaml"
     wait: true
     wait_timeout: 10m
+  register: logging_helm
+  until: logging_helm is succeeded
+  retries: 2
+  delay: 20
