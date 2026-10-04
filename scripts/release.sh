@@ -143,6 +143,30 @@ release() {
   say "Наблюдать отдельно: kubectl argo rollouts get rollout $ROLLOUT -n $NS --watch"
 }
 
+# Возврат закончен, когда контроллер обработал изменение шаблона, стабильной
+# стала текущая ревизия и подов прежних ревизий не осталось. Одного
+# `rollouts status` мало: сразу после изменения он успевает вернуть Healthy
+# для прежней ревизии, и около минуты трафик ещё обслуживает старая версия.
+wait_settled() {
+  local start=$SECONDS gen observed stable current phase replicas pods total other
+  while (( SECONDS - start < 420 )); do
+    read -r gen observed stable current phase replicas <<< "$(rollout_jsonpath \
+      '{.metadata.generation} {.status.observedGeneration} {.status.stableRS} {.status.currentPodHash} {.status.phase} {.spec.replicas}' || true)"
+    # Поды приложения по ревизиям: всего и не относящихся к текущей (включая завершающиеся)
+    pods=$(kubectl -n "$NS" get pods -l "app.kubernetes.io/name=$ROLLOUT" \
+      -o jsonpath='{range .items[*]}{.metadata.labels.rollouts-pod-template-hash}{"\n"}{end}' || true)
+    total=$(grep -c . <<< "$pods" || true)
+    other=$(grep -vxc -e "${current:-none}" -e '' <<< "$pods" || true)
+    if [[ -n ${current:-} && $gen == "$observed" && $phase == Healthy && $stable == "$current" \
+          && $total == "$replicas" && $other == 0 ]]; then
+      return 0
+    fi
+    sleep 3
+  done
+  say "${c_bad}✘ Rollout не вернулся к версии из Git за 7 мин.${c_0}"
+  return 1
+}
+
 reset() {
   local rev
   say "${c_b}Возврат к версии из Git${c_0}"
@@ -152,8 +176,12 @@ reset() {
     cmd "Argo CD: sync application demo → ${rev:0:7}"
     kubectl -n argocd patch application demo --type merge \
       -p "{\"operation\":{\"initiatedBy\":{\"username\":\"release.sh\"},\"sync\":{\"revision\":\"$rev\"}}}" >/dev/null
-    for _ in $(seq 60); do
-      [[ $(kubectl -n argocd get application demo -o jsonpath='{.status.sync.status}') == Synced ]] && break
+    # Ждём завершения самой операции (поле .operation снимается по окончании),
+    # а не только статуса Synced: иначе ещё идущая синхронизация откатила бы
+    # релиз, запущенный сразу после возврата
+    for _ in $(seq 90); do
+      [[ -z $(kubectl -n argocd get application demo -o jsonpath='{.operation}') \
+         && $(kubectl -n argocd get application demo -o jsonpath='{.status.sync.status}') == Synced ]] && break
       sleep 2
     done
   else
@@ -164,6 +192,7 @@ reset() {
   kubectl argo rollouts retry rollout "$ROLLOUT" -n "$NS" >/dev/null 2>&1 || true
   kubectl argo rollouts promote "$ROLLOUT" -n "$NS" --full >/dev/null 2>&1 || true
   kubectl argo rollouts status "$ROLLOUT" -n "$NS" --timeout 300s >/dev/null
+  wait_settled
   kubectl -n "$NS" delete configmap -l devops-case/release-config=true --ignore-not-found >/dev/null
   grafana_annotation "Возврат к версии из Git" reset
   say "${c_ok}✔ Версия из Git восстановлена, Rollout Healthy.${c_0}"

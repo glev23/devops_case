@@ -72,7 +72,7 @@ GIT_TERMINAL_PROMPT=0 git -c credential.helper= clone https://github.com/glev23/
 | Обязательные материалы | `ansible/`, `deploy/`, `helm-values/`, `scripts/` — автоматизация и манифесты; `deploy/gateway`, `deploy/app/httproute.yaml` — Gateway API; `helm-values/kube-prometheus-stack.yaml`, `deploy/monitoring` — мониторинг; `deploy/logging`, `helm-values/loki.yaml` — логирование; `README.md` |
 | Секреты | gitleaks по всей истории — чисто (job `secrets` в CI); пароли создаются при установке в Secret |
 | Архив | ZIP, 0,4 МБ; `Ссылка.txt` — одна строка со ссылкой на репозиторий; `Паспорт.pdf` — 4 страницы, 0,5 МБ |
-| GitHub Actions | Прогон QA-001 и паспорта — [run 37194880066](https://github.com/glev23/devops_case/actions/runs/37194880066), все шаги зелёные, e2e 12 мин 35 с |
+| GitHub Actions | Каждый коммит в `main` проходит полный прогон (lint, gitleaks, установка с нуля, проверки, релизы); прогон QA-001 и паспорта — [run 37194880066](https://github.com/glev23/devops_case/actions/runs/37194880066). Состояние итогового коммита показывает бейдж CI в README |
 
 Загрузка архива на площадку — действие участника; после неё ветка `main`
 не изменяется.
